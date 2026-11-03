@@ -1,0 +1,106 @@
+
+#ifndef __DOCXFACTORY_ZINT_COMPAT_H__
+#define __DOCXFACTORY_ZINT_COMPAT_H__
+
+// Minimal subset of the zint symbology / output option constants.
+// Used when barcode support (DOCXFACTORY_ENABLE_BARCODE) is disabled so the
+// field definitions can still refer to symbology codes.
+// Values are taken from zint 2.4.3.
+
+#define BARCODE_CODE11			1
+#define BARCODE_C25MATRIX		2
+#define BARCODE_C25INTER		3
+#define BARCODE_C25IATA			4
+#define BARCODE_C25LOGIC		6
+#define BARCODE_C25IND			7
+#define BARCODE_CODE39			8
+#define BARCODE_EXCODE39		9
+#define BARCODE_EANX			13
+#define BARCODE_EAN128			16
+#define BARCODE_CODABAR			18
+#define BARCODE_CODE128			20
+#define BARCODE_DPLEIT			21
+#define BARCODE_DPIDENT			22
+#define BARCODE_CODE16K			23
+#define BARCODE_CODE49			24
+#define BARCODE_CODE93			25
+#define BARCODE_FLAT			28
+#define BARCODE_RSS14			29
+#define BARCODE_RSS_LTD			30
+#define BARCODE_RSS_EXP			31
+#define BARCODE_TELEPEN			32
+#define BARCODE_UPCA			34
+#define BARCODE_UPCE			37
+#define BARCODE_POSTNET			40
+#define BARCODE_MSI_PLESSEY		47
+#define BARCODE_FIM				49
+#define BARCODE_LOGMARS			50
+#define BARCODE_PHARMA			51
+#define BARCODE_PZN				52
+#define BARCODE_PHARMA_TWO		53
+#define BARCODE_PDF417			55
+#define BARCODE_PDF417TRUNC		56
+#define BARCODE_MAXICODE		57
+#define BARCODE_QRCODE			58
+#define BARCODE_CODE128B		60
+#define BARCODE_AUSPOST			63
+#define BARCODE_AUSREPLY		66
+#define BARCODE_AUSROUTE		67
+#define BARCODE_AUSREDIRECT		68
+#define BARCODE_ISBNX			69
+#define BARCODE_RM4SCC			70
+#define BARCODE_DATAMATRIX		71
+#define BARCODE_EAN14			72
+#define BARCODE_NVE18			75
+#define BARCODE_JAPANPOST		76
+#define BARCODE_KOREAPOST		77
+#define BARCODE_RSS14STACK		79
+#define BARCODE_RSS14STACK_OMNI	80
+#define BARCODE_RSS_EXPSTACK	81
+#define BARCODE_PLANET			82
+#define BARCODE_MICROPDF417		84
+#define BARCODE_ONECODE			85
+#define BARCODE_PLESSEY			86
+#define BARCODE_TELEPEN_NUM		87
+#define BARCODE_ITF14			89
+#define BARCODE_KIX				90
+#define BARCODE_AZTEC			92
+#define BARCODE_DAFT			93
+#define BARCODE_MICROQR			97
+#define BARCODE_HIBC_128		98
+#define BARCODE_HIBC_39			99
+#define BARCODE_HIBC_DM			102
+#define BARCODE_HIBC_QR			104
+#define BARCODE_HIBC_PDF		106
+#define BARCODE_HIBC_MICPDF		108
+#define BARCODE_HIBC_AZTEC		112
+#define BARCODE_AZRUNE			128
+#define BARCODE_CODE32			129
+#define BARCODE_EANX_CC			130
+#define BARCODE_EAN128_CC		131
+#define BARCODE_RSS14_CC		132
+#define BARCODE_RSS_LTD_CC		133
+#define BARCODE_RSS_EXP_CC		134
+#define BARCODE_UPCA_CC			135
+#define BARCODE_UPCE_CC			136
+#define BARCODE_RSS14STACK_CC	137
+#define BARCODE_RSS14_OMNI_CC	138
+#define BARCODE_RSS_EXPSTACK_CC	139
+#define BARCODE_CHANNEL			140
+#define BARCODE_CODEONE			141
+#define BARCODE_GRIDMATRIX		142
+
+#define BARCODE_NO_ASCII		1
+#define BARCODE_BIND			2
+#define BARCODE_BOX				4
+#define BARCODE_STDOUT			8
+
+#define DATA_MODE				0
+#define UNICODE_MODE			1
+#define GS1_MODE				2
+
+// Data Matrix option 3
+#define DM_SQUARE				1
+#define DM_GS1					2
+
+#endif

@@ -12,7 +12,7 @@
 #include "DocxFactory/locale/LocaleFunc.h"
 #include "DocxFactory/str/StrFunc.h"
 
-#include "boost/scoped_array.hpp"
+#include <memory>
 
 using namespace DocxFactory;
 using namespace std;
@@ -92,7 +92,7 @@ string DocxMergerTextField::encodeT(
 	bool			l_tab		= false;
 	unsigned char	l_ch;
 
-	boost::scoped_array<char>	l_dstStr( new char[ l_srcLen * 6 + 1 ] );
+	std::unique_ptr<char[]>	l_dstStr( new char[ l_srcLen * 6 + 1 ] );
 
 	while ( l_srcPos < l_srcLen )
 	{

@@ -14,6 +14,8 @@
 #include "DocxFactory/math/MathFunc.h"
 #include "DocxFactory/util/DocxFactoryDefs.h"
 
+#include <cmath>
+
 using namespace DocxFactory;
 using namespace std;
 

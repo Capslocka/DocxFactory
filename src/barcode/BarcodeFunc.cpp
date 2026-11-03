@@ -4,7 +4,9 @@
 
 #include "DocxFactory/str/StrFunc.h"
 
-#include "zint/zint.h"
+#if defined( DOCXFACTORY_HAVE_ZINT )
+	#include "zint/zint.h"
+#endif
 
 #include <climits>
 #include <cstring>
@@ -21,6 +23,8 @@ bool BarcodeFunc::encodeAndPrint(
 	string&			p_errTxt,
 	string&			p_retVal )
 {
+#if defined( DOCXFACTORY_HAVE_ZINT )
+
 	string				l_primary	= "";
 	string				l_value		= p_value;
 	
@@ -104,4 +108,13 @@ bool BarcodeFunc::encodeAndPrint(
 		return false;
 	else
 		return true;
+
+#else
+
+	p_retVal	= "";
+	p_errTxt	= "barcode support is not enabled in this build of DocxFactory.";
+
+	return false;
+
+#endif
 } // encodeAndPrint

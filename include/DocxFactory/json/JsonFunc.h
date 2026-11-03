@@ -1,11 +1,15 @@
 #ifndef __DOCXFACTORY_JSON_FUNC_H__
 #define __DOCXFACTORY_JSON_FUNC_H__
 
-#include "rapidjson/document.h"
+#if defined( DOCXFACTORY_HAVE_RAPIDJSON )
+	#include "rapidjson/document.h"
+#endif
 
 #include <string>
 
 
+
+#if defined( DOCXFACTORY_HAVE_RAPIDJSON )
 
 namespace DocxFactory
 {	
@@ -26,5 +30,7 @@ namespace DocxFactory
 
 	};
 };
+
+#endif
 
 #endif

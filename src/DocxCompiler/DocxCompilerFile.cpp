@@ -29,7 +29,7 @@
 #include "DocxFactory/str/StrFunc.h"
 #include "DocxFactory/util/DocxFactoryDefs.h"
 
-#include "boost/scoped_ptr.hpp"
+#include <memory>
 
 using namespace DocxFactory;
 using namespace std;

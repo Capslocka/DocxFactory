@@ -23,7 +23,7 @@
 
 #include "xercesc/dom/DOM.hpp"
 
-#include "boost/scoped_ptr.hpp"
+#include <memory>
 
 #include <set>
 
@@ -249,7 +249,7 @@ void DocxCompilerStyleFile::normalize()
 {
 	m_part ->setChangeStatus( OpcPart::PART_CHANGED_IN_DOM );
 
-	boost::scoped_ptr<XmlTreeDriller> l_treeDriller( new XmlTreeDriller(
+	std::unique_ptr<XmlTreeDriller> l_treeDriller( new XmlTreeDriller(
 
 		m_stylesNode,
 		"http://schemas.openxmlformats.org/wordprocessingml/2006/main", "style",

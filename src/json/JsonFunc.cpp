@@ -8,6 +8,8 @@ using namespace std;
 
 
 
+#if defined( DOCXFACTORY_HAVE_RAPIDJSON )
+
 string JsonFunc::getStr( rapidjson::Value* p_value )
 {	
 	if ( p_value ->IsString() )
@@ -40,4 +42,4 @@ double JsonFunc::getNum( rapidjson::Value* p_value )
 	return 0.0f;
 } // getNum
 
-
+#endif

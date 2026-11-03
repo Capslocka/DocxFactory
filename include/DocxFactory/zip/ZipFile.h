@@ -8,8 +8,7 @@
 #include "zlib/zip.h"
 #include "zlib/unzip.h"
 
-#include "boost/type_traits.hpp"
-#include "boost/utility/enable_if.hpp"
+#include <type_traits>
 
 #include <map>
 #include <string>
@@ -85,11 +84,11 @@ namespace DocxFactory
 		// write functions save numeric values in the same byte order independently of the operating system
 		// so the values can be retrieved from the file in the same way independently of where they were saved.
 
-		template <class T>
-		typename boost::enable_if<boost::is_integral<T>, void>::type		writeNum( T p_val );
+		template <class T, typename std::enable_if<std::is_integral<T>::value, int>::type = 0>
+		void	writeNum( T p_val );
 
-		template <class T>
-		typename boost::enable_if<boost::is_floating_point<T>, void>::type	writeNum( T p_val );
+		template <class T, typename std::enable_if<std::is_floating_point<T>::value, int>::type = 0>
+		void	writeNum( T p_val );
 
 		void writePtr	( void*			p_ptr );
 		void writeStr	( const string&	p_str );
@@ -126,16 +125,16 @@ namespace DocxFactory
 
 	};
 
-	template <class T>
-	typename boost::enable_if<boost::is_integral<T>, void>::type ZipFile::writeNum( T p_val )
+	template <class T, typename std::enable_if<std::is_integral<T>::value, int>::type>
+	void ZipFile::writeNum( T p_val )
 	{
 		ZipFunc::toLittleEndian( p_val );
 
 		write( ( char* ) &p_val, sizeof( p_val ) );
 	} // writeNum<integral>
 
-	template <class T>
-	typename boost::enable_if<boost::is_floating_point<T>, void>::type ZipFile::writeNum( T p_val )
+	template <class T, typename std::enable_if<std::is_floating_point<T>::value, int>::type>
+	void ZipFile::writeNum( T p_val )
 	{
 		DoublePack l_pack = ZipFunc::pack( ( double ) p_val );
 

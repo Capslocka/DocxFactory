@@ -2,8 +2,7 @@
 #ifndef __DOCXFACTORY_STR_FUNC_H__
 #define __DOCXFACTORY_STR_FUNC_H__
 
-#include "boost/type_traits.hpp"
-#include "boost/utility/enable_if.hpp"
+#include <type_traits>
 
 #include <set>
 #include <string>
@@ -19,20 +18,20 @@ namespace DocxFactory
 	class StrFunc
 	{
 	public:
-		template <class T>
-		static typename boost::enable_if<boost::is_signed<T>, string>::type			intToStr( T p_val );
+		template <class T, typename std::enable_if<std::is_signed<T>::value && !std::is_floating_point<T>::value, int>::type = 0>
+		static string	intToStr( T p_val );
 
-		template <class T>
-		static typename boost::enable_if<boost::is_unsigned<T>, string>::type		intToStr( T p_val );
+		template <class T, typename std::enable_if<std::is_unsigned<T>::value, int>::type = 0>
+		static string	intToStr( T p_val );
 
-		template <class T>
-		static typename boost::enable_if<boost::is_floating_point<T>, string>::type	intToStr( T p_val, unsigned short p_precision = 3 );
+		template <class T, typename std::enable_if<std::is_floating_point<T>::value, int>::type = 0>
+		static string	intToStr( T p_val, unsigned short p_precision = 3 );
 
-		template <class T>
-		static typename boost::enable_if<boost::is_integral<T>, T>::type			strToInt( const string& p_str );
+		template <class T, typename std::enable_if<std::is_integral<T>::value, int>::type = 0>
+		static T		strToInt( const string& p_str );
 
-		template <class T>
-		static typename boost::enable_if<boost::is_floating_point<T>, T>::type		strToInt( const string& p_str );
+		template <class T, typename std::enable_if<std::is_floating_point<T>::value, int>::type = 0>
+		static T		strToInt( const string& p_str );
 
 		static bool		isNum			( const string& p_str );
 		static bool		isHex			( const string& p_str );
@@ -70,8 +69,8 @@ namespace DocxFactory
 
 	};
 
-	template <class T>
-	typename boost::enable_if<boost::is_signed<T>, string>::type StrFunc::intToStr( T p_val )
+	template <class T, typename std::enable_if<std::is_signed<T>::value && !std::is_floating_point<T>::value, int>::type>
+	string StrFunc::intToStr( T p_val )
 	{
 		// the if below is necessary otherwise 0 will return blank. it's not an optimization.
 		if ( p_val == 0 )
@@ -109,8 +108,8 @@ namespace DocxFactory
 		return l_str + l_pos;
 	} // intToStr<signed>
 
-	template <class T>
-	typename boost::enable_if<boost::is_unsigned<T>, string>::type StrFunc::intToStr( T p_val )
+	template <class T, typename std::enable_if<std::is_unsigned<T>::value, int>::type>
+	string StrFunc::intToStr( T p_val )
 	{
 		// the if below is necessary otherwise 0 will return blank. it's not an optimization.
 		if ( p_val == 0 )
@@ -135,8 +134,8 @@ namespace DocxFactory
 		return l_str + l_pos;
 	} // intToStr<unsigned>
  
-	template <class T>
-	typename boost::enable_if<boost::is_floating_point<T>, string>::type StrFunc::intToStr( T p_val, unsigned short p_precision )
+	template <class T, typename std::enable_if<std::is_floating_point<T>::value, int>::type>
+	string StrFunc::intToStr( T p_val, unsigned short p_precision )
 	{
 		const int		l_maxSize = 50; // -30.10
 		char			l_buff	[ l_maxSize ];
@@ -269,8 +268,8 @@ namespace DocxFactory
 
 
 
-	template <class T>
-	typename boost::enable_if<boost::is_integral<T>, T>::type StrFunc::strToInt( const string& p_str )
+	template <class T, typename std::enable_if<std::is_integral<T>::value, int>::type>
+	T StrFunc::strToInt( const string& p_str )
 	{
 		const char*	l_str;
 		T			l_retVal	= 0;
@@ -304,8 +303,8 @@ namespace DocxFactory
 		return l_retVal;
 	} // strToInt<is_integral>
 
-	template <class T>
-	typename boost::enable_if<boost::is_floating_point<T>, T>::type StrFunc::strToInt( const string& p_str )
+	template <class T, typename std::enable_if<std::is_floating_point<T>::value, int>::type>
+	T StrFunc::strToInt( const string& p_str )
 	{
 		const char*	l_str;
 		T			l_retVal	= 0;

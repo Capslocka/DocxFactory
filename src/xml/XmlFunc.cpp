@@ -14,9 +14,7 @@
 #include "xercesc/framework/MemBufFormatTarget.hpp"
 #include "xercesc/framework/MemBufInputSource.hpp"
 
-#include "unicode/ucnv.h"
-
-#include "boost/scoped_array.hpp"
+#include <memory>
 
 #include <set>
 #include <list>
@@ -24,6 +22,10 @@
 
 using namespace DocxFactory;
 using namespace std;
+
+#if !defined( DOCXFACTORY_USE_ICU )
+	#define UCNV_GET_MAX_BYTES_FOR_STRING( len, maxCharSize ) ( ( ( len ) + 2 ) * ( maxCharSize ) )
+#endif
 
 
 
@@ -650,7 +652,7 @@ string XmlFunc::encodeXml( const string& p_srcStr )
 	size_t			l_dstPos	= 0;
 	unsigned char	l_ch;
 
-	boost::scoped_array<char> l_dstStr( new char[ l_srcLen * 6 + 1 ] );
+	std::unique_ptr<char[]> l_dstStr( new char[ l_srcLen * 6 + 1 ] );
 
 	while ( l_srcPos < l_srcLen )
 	{
@@ -704,8 +706,8 @@ string XmlFunc::XMLChToUtf8( const XMLCh* p_xstr )
 	if ( p_xstr == NULL || *p_xstr == 0 )
 		return "";
 
-	boost::scoped_array<UChar>	l_ustr;
-	boost::scoped_array<char>	l_str;
+	std::unique_ptr<UChar[]>	l_ustr;
+	std::unique_ptr<char[]>	l_str;
 	size_t						l_len = getXMLChLen( p_xstr );
 
 	l_ustr.reset( XMLChToUChar( p_xstr, l_len ) );
@@ -719,8 +721,8 @@ string XmlFunc::XMLChToStr( const XMLCh* p_xstr )
 	if ( p_xstr == NULL || *p_xstr == 0 )
 		return "";
 
-	boost::scoped_array<UChar>	l_ustr;
-	boost::scoped_array<char>	l_str;
+	std::unique_ptr<UChar[]>	l_ustr;
+	std::unique_ptr<char[]>	l_str;
 	size_t						l_len = getXMLChLen( p_xstr );
 
 	l_ustr.reset( XMLChToUChar( p_xstr, l_len ) );
@@ -731,7 +733,7 @@ string XmlFunc::XMLChToStr( const XMLCh* p_xstr )
 
 XMLCh* XmlFunc::utf8ToXMLCh( const string& p_str )
 {
-	boost::scoped_array<UChar>	l_ustr;
+	std::unique_ptr<UChar[]>	l_ustr;
 	XMLCh*						l_xstr;
 
 	l_ustr.reset( LocaleFunc::utf8ToUChar( p_str.c_str(), p_str.length() ) );
@@ -742,7 +744,7 @@ XMLCh* XmlFunc::utf8ToXMLCh( const string& p_str )
 
 XMLCh* XmlFunc::strToXMLCh( const string& p_str )
 {
-	boost::scoped_array<UChar>	l_ustr;
+	std::unique_ptr<UChar[]>	l_ustr;
 	XMLCh*						l_xstr;
 
 	l_ustr.reset( LocaleFunc::strToUChar( p_str.c_str(), p_str.length() ) );

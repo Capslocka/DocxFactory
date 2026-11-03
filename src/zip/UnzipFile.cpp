@@ -10,7 +10,7 @@
 #include "DocxFactory/os/FileNotFoundException.h"
 #include "DocxFactory/os/FileExistsException.h"
 
-#include "boost/scoped_array.hpp"
+#include <memory>
 
 using namespace DocxFactory;
 using namespace std;
@@ -186,7 +186,7 @@ void UnzipFile::extractEntryToFile(
 {
 	size_t l_bufSize;
 
-	boost::scoped_array<byte> l_buf( extractEntryToBuf( p_path, l_bufSize ) );
+	std::unique_ptr<byte[]> l_buf( extractEntryToBuf( p_path, l_bufSize ) );
 
 	OsFunc::writeFile( p_fileName, l_buf.get(), l_bufSize );
 } // extractEntryToFile
@@ -254,7 +254,7 @@ void UnzipFile::read( char* p_buf, size_t p_bufSize )
 string UnzipFile::readStr()
 {
 	uint32						l_bufSize	= readNum<uint32>();
-	boost::scoped_array<char>	l_buf( new char[ l_bufSize + 1 ] );
+	std::unique_ptr<char[]>	l_buf( new char[ l_bufSize + 1 ] );
 
 	read( l_buf.get(), l_bufSize );
 	l_buf[ l_bufSize ] = NULL;

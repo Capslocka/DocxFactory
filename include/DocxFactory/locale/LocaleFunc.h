@@ -4,12 +4,19 @@
 
 #include "DocxFactory/util/DocxFactoryDefs.h"
 
-#include "unicode/ucnv.h"
+#if defined( DOCXFACTORY_USE_ICU )
+	#include "unicode/ucnv.h"
+#endif
 
 #include <list>
 #include <string>
+#include <cstdint>
 
 
+
+#if !defined( DOCXFACTORY_USE_ICU )
+	typedef uint16_t UChar;
+#endif
 
 struct UConverter;
 

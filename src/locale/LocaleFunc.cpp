@@ -16,11 +16,15 @@
 #include "DocxFactory/util/DocxFactoryDefs.h"
 #include "DocxFactory/util/tchar.h"
 
-#include "unicode/ucnv.h"
-#include "unicode/unistr.h"
-#include "unicode/ustring.h"
+#if defined( DOCXFACTORY_USE_ICU )
+	#include "unicode/ucnv.h"
+	#include "unicode/unistr.h"
+	#include "unicode/ustring.h"
+#endif
 
-#include "boost/scoped_array.hpp"
+#include <memory>
+#include <cstdlib>
+#include <cstring>
 
 #include <locale>
 
@@ -32,6 +36,22 @@
 
 using namespace DocxFactory;
 using namespace std;
+
+
+
+// MinGW's std::locale( "" ) throws on Windows, fall back to the classic locale.
+static locale getEnvLocale()
+{
+	try
+	{
+		return locale( "" );
+	}
+
+	catch ( ... )
+	{
+		return locale();
+	}
+}
 
 
 
@@ -61,10 +81,289 @@ string		LocaleFunc::m_monthShortNamesUtf8[12];
 
 
 
+#if !defined( DOCXFACTORY_USE_ICU )
+
+static bool isUtf8CodePage( const string& p_codePage )
+{
+	string l_name = StrFunc::lc( p_codePage );
+
+	return l_name == "utf-8"
+		|| l_name == "utf8"
+		|| l_name == "utf_8"
+		|| l_name == "65001"
+		|| l_name == "cp65001"
+		|| l_name == "windows-65001";
+} // isUtf8CodePage
+
+static void appendUtf8( char* p_dst, size_t& p_pos, unsigned int p_cp )
+{
+	if ( p_cp < 0x80 )
+		p_dst[ p_pos++ ] = ( char ) p_cp;
+
+	else
+	if ( p_cp < 0x800 )
+	{
+		p_dst[ p_pos++ ] = ( char ) ( 0xC0 | ( p_cp >> 6 ) );
+		p_dst[ p_pos++ ] = ( char ) ( 0x80 | ( p_cp & 0x3F ) );
+	}
+
+	else
+	if ( p_cp < 0x10000 )
+	{
+		p_dst[ p_pos++ ] = ( char ) ( 0xE0 | ( p_cp >> 12 ) );
+		p_dst[ p_pos++ ] = ( char ) ( 0x80 | ( ( p_cp >> 6 ) & 0x3F ) );
+		p_dst[ p_pos++ ] = ( char ) ( 0x80 | ( p_cp & 0x3F ) );
+	}
+
+	else
+	{
+		p_dst[ p_pos++ ] = ( char ) ( 0xF0 | ( p_cp >> 18 ) );
+		p_dst[ p_pos++ ] = ( char ) ( 0x80 | ( ( p_cp >> 12 ) & 0x3F ) );
+		p_dst[ p_pos++ ] = ( char ) ( 0x80 | ( ( p_cp >> 6 ) & 0x3F ) );
+		p_dst[ p_pos++ ] = ( char ) ( 0x80 | ( p_cp & 0x3F ) );
+	}
+} // appendUtf8
+
+static UChar* utf8ToUCharFallback( const char* p_str, size_t p_len )
+{
+	std::unique_ptr<UChar[]>	l_buf( new UChar[ p_len + 1 ] );
+	size_t						l_srcPos = 0;
+	size_t						l_dstPos = 0;
+
+	while ( l_srcPos < p_len )
+	{
+		unsigned char	l_ch	= ( unsigned char ) p_str[ l_srcPos ];
+		unsigned int	l_cp	= 0;
+		size_t			l_len	= 1;
+
+		if ( l_ch < 0x80 )
+			l_cp = l_ch;
+
+		else
+		if ( ( l_ch & 0xE0 ) == 0xC0 )
+		{
+			l_cp	= l_ch & 0x1F;
+			l_len	= 2;
+		}
+
+		else
+		if ( ( l_ch & 0xF0 ) == 0xE0 )
+		{
+			l_cp	= l_ch & 0x0F;
+			l_len	= 3;
+		}
+
+		else
+		if ( ( l_ch & 0xF8 ) == 0xF0 )
+		{
+			l_cp	= l_ch & 0x07;
+			l_len	= 4;
+		}
+
+		else
+			l_cp = 0xFFFD;
+
+		if ( l_len > 1 )
+		{
+			if ( l_srcPos + l_len > p_len )
+			{
+				l_cp	= 0xFFFD;
+				l_len	= 1;
+			}
+
+			else
+			{
+				for ( size_t l_i = 1; l_i < l_len; l_i++ )
+				{
+					unsigned char l_cont = ( unsigned char ) p_str[ l_srcPos + l_i ];
+
+					if ( ( l_cont & 0xC0 ) != 0x80 )
+					{
+						l_cp	= 0xFFFD;
+						l_len	= 1;
+						break;
+					}
+
+					l_cp = ( l_cp << 6 ) | ( l_cont & 0x3F );
+				}
+			}
+		}
+
+		l_srcPos += l_len;
+
+		if ( l_cp > 0xFFFF )
+		{
+			l_cp -= 0x10000;
+			l_buf[ l_dstPos++ ] = ( UChar ) ( 0xD800 + ( l_cp >> 10 ) );
+			l_buf[ l_dstPos++ ] = ( UChar ) ( 0xDC00 + ( l_cp & 0x3FF ) );
+		}
+
+		else
+			l_buf[ l_dstPos++ ] = ( UChar ) l_cp;
+	}
+
+	l_buf[ l_dstPos ] = 0;
+
+	return l_buf.release();
+} // utf8ToUCharFallback
+
+static char* uCharToUtf8Fallback( const UChar* p_ustr, size_t p_len )
+{
+	std::unique_ptr<char[]>	l_buf( new char[ p_len * 4 + 1 ] );
+	size_t					l_dstPos = 0;
+
+	for ( size_t l_srcPos = 0; l_srcPos < p_len; l_srcPos++ )
+	{
+		unsigned int l_cp = p_ustr[ l_srcPos ];
+
+		if ( l_cp >= 0xD800 && l_cp <= 0xDBFF && l_srcPos + 1 < p_len )
+		{
+			unsigned int l_lo = p_ustr[ l_srcPos + 1 ];
+
+			if ( l_lo >= 0xDC00 && l_lo <= 0xDFFF )
+			{
+				l_cp = 0x10000 + ( ( l_cp - 0xD800 ) << 10 ) + ( l_lo - 0xDC00 );
+				l_srcPos++;
+			}
+		}
+
+		appendUtf8( l_buf.get(), l_dstPos, l_cp );
+	}
+
+	l_buf[ l_dstPos ] = 0;
+
+	return l_buf.release();
+} // uCharToUtf8Fallback
+
+#if !defined( _WIN32 ) && !defined( _WIN64 )
+
+static char* wcharToUtf8Fallback( const wchar_t* p_wstr, size_t p_len )
+{
+	std::unique_ptr<char[]>	l_buf( new char[ p_len * 4 + 1 ] );
+	size_t					l_dstPos = 0;
+
+	for ( size_t l_srcPos = 0; l_srcPos < p_len; l_srcPos++ )
+		appendUtf8( l_buf.get(), l_dstPos, ( unsigned int ) p_wstr[ l_srcPos ] );
+
+	l_buf[ l_dstPos ] = 0;
+
+	return l_buf.release();
+} // wcharToUtf8Fallback
+
+#endif
+
+#if defined( _WIN32 ) || defined( _WIN64 )
+
+static UINT codePageToWinId( const string& p_codePage )
+{
+	string	l_name	= StrFunc::lc( p_codePage );
+	size_t	l_begin	= l_name.find_first_not_of( " \t" );
+	size_t	l_end	= l_name.find_last_not_of( " \t" );
+	size_t	l_num;
+
+	if ( l_begin == string::npos )
+		return 0;
+
+	l_name = l_name.substr( l_begin, l_end - l_begin + 1 );
+
+	if ( l_name == "utf-8"		|| l_name == "utf8"		|| l_name == "utf_8" )			return CP_UTF8;
+	if ( l_name == "us-ascii"	|| l_name == "ascii"	|| l_name == "ansi_x3.4-1968" )	return 20127;
+	if ( l_name == "iso-8859-1"	|| l_name == "iso8859-1"|| l_name == "latin1" )			return 28591;
+	if ( l_name == "utf-16le" )															return 1200;
+	if ( l_name == "utf-16be" )															return 1201;
+	if ( l_name == "gbk"		|| l_name == "gb2312"	|| l_name == "euc-cn" )			return 936;
+	if ( l_name == "gb18030" )															return 54936;
+	if ( l_name == "big5" )																return 950;
+	if ( l_name == "shift_jis"	|| l_name == "shift-jis"|| l_name == "sjis" )			return 932;
+	if ( l_name == "euc-kr" )															return 949;
+
+	if		( l_name.compare( 0, 8, "windows-" ) == 0 )	l_num = 8;
+	else if	( l_name.compare( 0, 2, "cp" )       == 0 )	l_num = 2;
+	else												l_num = 0;
+
+	l_name = l_name.substr( l_num );
+
+	if ( !l_name.empty() && l_name.find_first_not_of( "0123456789" ) == string::npos )
+	{
+		unsigned long l_id = strtoul( l_name.c_str(), NULL, 10 );
+
+		if ( l_id <= 0xFFFF && IsValidCodePage( ( UINT ) l_id ) )
+			return ( UINT ) l_id;
+	}
+
+	return 0;
+} // codePageToWinId
+
+static string codePageFromWinId( UINT p_id )
+{
+	if ( p_id == 0 )
+		p_id = GetACP();
+
+	if ( p_id == CP_UTF8 )	return "UTF-8";
+	if ( p_id == 20127 )	return "US-ASCII";
+	if ( p_id == 28591 )	return "ISO-8859-1";
+
+	return "windows-" + StrFunc::intToStr( ( int ) p_id );
+} // codePageFromWinId
+
+static UChar* multiByteToUChar( const char* p_str, size_t p_len, UINT p_codePage )
+{
+	std::unique_ptr<UChar[]>	l_buf;
+	int							l_len;
+
+	l_buf.reset( new UChar[ 1 ] );
+	l_buf[ 0 ] = 0;
+
+	if ( p_len == 0 || p_len > 0x7FFFFFFF )
+		return l_buf.release();
+
+	l_len = MultiByteToWideChar( p_codePage, 0, p_str, ( int ) p_len, NULL, 0 );
+
+	if ( l_len <= 0 )
+		return l_buf.release();
+
+	l_buf.reset( new UChar[ l_len + 1 ] );
+
+	MultiByteToWideChar( p_codePage, 0, p_str, ( int ) p_len, ( LPWSTR ) l_buf.get(), l_len );
+	l_buf[ l_len ] = 0;
+
+	return l_buf.release();
+} // multiByteToUChar
+
+static char* uCharToMultiByte( const UChar* p_ustr, size_t p_len, UINT p_codePage )
+{
+	std::unique_ptr<char[]>	l_buf;
+	int						l_len;
+
+	l_buf.reset( new char[ 1 ] );
+	l_buf[ 0 ] = 0;
+
+	if ( p_len == 0 || p_len > 0x7FFFFFFF )
+		return l_buf.release();
+
+	l_len = WideCharToMultiByte( p_codePage, 0, ( LPCWSTR ) p_ustr, ( int ) p_len, NULL, 0, NULL, NULL );
+
+	if ( l_len <= 0 )
+		return l_buf.release();
+
+	l_buf.reset( new char[ l_len + 1 ] );
+
+	WideCharToMultiByte( p_codePage, 0, ( LPCWSTR ) p_ustr, ( int ) p_len, l_buf.get(), l_len, NULL, NULL );
+	l_buf[ l_len ] = 0;
+
+	return l_buf.release();
+} // uCharToMultiByte
+
+#endif
+
+#endif
+
 void LocaleFunc::setCodePage()
 {
 	if ( !m_initialized )
 		initialize();
+
+#if defined( DOCXFACTORY_USE_ICU )
 
 	const char*	l_icuName;
 	const char*	l_stdName;
@@ -82,6 +381,16 @@ void LocaleFunc::setCodePage()
 	else
 		m_codePage = l_icuName;
 
+#elif defined( _WIN32 ) || defined( _WIN64 )
+
+	m_codePage = codePageFromWinId( GetACP() );
+
+#else
+
+	m_codePage = "UTF-8";
+
+#endif
+
 	setCnv();
 } // setCodePage
 
@@ -90,12 +399,32 @@ void LocaleFunc::setCodePage( const string& p_codePage )
 	if ( !m_initialized )
 		initialize();
 
+#if defined( DOCXFACTORY_USE_ICU )
+
 	UErrorCode l_err = U_ZERO_ERROR;
 
 	if ( ucnv_open( p_codePage.c_str(), &l_err ) == NULL )
 		throw InvalidCodePageException( p_codePage,	__FILE__, __LINE__ );
 
 	m_codePage = p_codePage;
+
+#elif defined( _WIN32 ) || defined( _WIN64 )
+
+	UINT l_id = codePageToWinId( p_codePage );
+
+	if ( l_id == 0 )
+		throw InvalidCodePageException( p_codePage, __FILE__, __LINE__ );
+
+	m_codePage = codePageFromWinId( l_id );
+
+#else
+
+	if ( !isUtf8CodePage( p_codePage ) )
+		throw InvalidCodePageException( p_codePage, __FILE__, __LINE__ );
+
+	m_codePage = "UTF-8";
+
+#endif
 
 	setCnv();
 
@@ -153,7 +482,7 @@ void LocaleFunc::setNumFracSep( char p_frac )
 
 	if ( p_frac == 0 )
 	{
-		locale l_env( "" );
+		locale l_env = getEnvLocale();
 		m_numFracSep = use_facet<numpunct<char>>( l_env ).decimal_point();
 	}
 
@@ -168,7 +497,7 @@ void LocaleFunc::setNumThSep( char p_th )
 
 	if ( p_th == 0 )
 	{
-		locale l_env( "" );
+		locale l_env = getEnvLocale();
 		m_numThSep = use_facet<numpunct<char>>( l_env ).thousands_sep();
 	}
 
@@ -188,7 +517,7 @@ void LocaleFunc::setDateFormat( const string& p_dateFormat )
 	
 	if ( p_dateFormat.empty() )
 	{
-		locale l_env( "" );
+		locale l_env = getEnvLocale();
 
 		l_dateFormat = use_facet<time_get<char>>( l_env ).date_order();
 
@@ -2034,17 +2363,19 @@ string LocaleFunc::getSubStr( const string& p_str, size_t p_start, size_t p_len 
 	if ( !m_initialized )
 		initialize();
 
-	boost::scoped_array<char>	l_buf;
-	int32_t						l_bufSize;
-	int32_t						l_bufLen;
-
-	UErrorCode	l_err	= U_ZERO_ERROR;
-
 	if ( p_str.empty() )
 		return "";
 
 	if ( m_singleByteCodePage )
 		return p_str.substr( p_start, p_len );
+
+#if defined( DOCXFACTORY_USE_ICU )
+
+	std::unique_ptr<char[]>	l_buf;
+	int32_t						l_bufSize;
+	int32_t						l_bufLen;
+
+	UErrorCode	l_err	= U_ZERO_ERROR;
 
 	UnicodeString	l_ustr(
 		p_str.c_str(),
@@ -2067,6 +2398,26 @@ string LocaleFunc::getSubStr( const string& p_str, size_t p_start, size_t p_len 
 		throw IcuException( "UnicodeString.extract", l_err, __FILE__, __LINE__ );
 
 	return l_buf.get();
+
+#else
+
+	std::unique_ptr<UChar[]>	l_ustr( strToUChar( p_str.c_str(), p_str.length() ) );
+	size_t						l_ustrLen = 0;
+	size_t						l_end;
+
+	while ( l_ustr[ l_ustrLen ] != 0 )
+		l_ustrLen++;
+
+	l_end = ( p_len < l_ustrLen ) ? p_len : l_ustrLen;
+
+	if ( p_start >= l_end )
+		return "";
+
+	std::unique_ptr<char[]>	l_str( ucharToStr( l_ustr.get() + p_start, l_end - p_start ) );
+
+	return l_str.get();
+
+#endif
 } // getSubStr
 
 string LocaleFunc::getSubStrUtf8( const string& p_str, size_t p_start, size_t p_len )
@@ -2077,6 +2428,8 @@ string LocaleFunc::getSubStrUtf8( const string& p_str, size_t p_start, size_t p_
 	if ( p_str.empty() )
 		return "";
 
+#if defined( DOCXFACTORY_USE_ICU )
+
 	UnicodeString	l_ustr = UnicodeString::fromUTF8( p_str );
 	string			l_str;
 
@@ -2084,6 +2437,26 @@ string LocaleFunc::getSubStrUtf8( const string& p_str, size_t p_start, size_t p_
 	l_ustr.toUTF8String( l_str );
 
 	return l_str;
+
+#else
+
+	std::unique_ptr<UChar[]>	l_ustr( utf8ToUChar( p_str.c_str(), p_str.length() ) );
+	size_t						l_ustrLen = 0;
+	size_t						l_end;
+
+	while ( l_ustr[ l_ustrLen ] != 0 )
+		l_ustrLen++;
+
+	l_end = ( p_len < l_ustrLen ) ? p_len : l_ustrLen;
+
+	if ( p_start >= l_end )
+		return "";
+
+	std::unique_ptr<char[]>	l_str( ucharToUtf8( l_ustr.get() + p_start, l_end - p_start ) );
+
+	return l_str.get();
+
+#endif
 } // getSubStrUtf8
 
 
@@ -2096,11 +2469,20 @@ string LocaleFunc::convertToUtf8( const string& p_str )
 	if ( p_str.empty() )
 		return "";
 
+#if defined( DOCXFACTORY_USE_ICU )
+
 	if ( ucnv_getType( m_cnv ) == UCNV_UTF8 )
 		return p_str;
 
-	boost::scoped_array<UChar>	l_ustr;
-	boost::scoped_array<char>	l_str;
+#else
+
+	if ( isUtf8CodePage( m_codePage ) )
+		return p_str;
+
+#endif
+
+	std::unique_ptr<UChar[]>	l_ustr;
+	std::unique_ptr<char[]>	l_str;
 
 	l_ustr.reset( strToUChar( p_str.c_str(), p_str.length() ) );
 	l_str.reset	( ucharToUtf8( l_ustr.get(), p_str.length() ) );
@@ -2116,8 +2498,10 @@ string LocaleFunc::convertToUtf8( const wstring& p_wstr )
 	if ( p_wstr.empty() )
 		return "";
 
-	boost::scoped_array<char>	l_str;
-	boost::scoped_array<UChar>	l_buf;
+#if defined( DOCXFACTORY_USE_ICU )
+
+	std::unique_ptr<char[]>	l_str;
+	std::unique_ptr<UChar[]>	l_buf;
 	int32_t						l_bufSize;
 	int32_t						l_bufLen;
 
@@ -2142,6 +2526,20 @@ string LocaleFunc::convertToUtf8( const wstring& p_wstr )
 	l_str.reset( ucharToUtf8( l_buf.get(), p_wstr.length() ) );
 	
 	return l_str.get();
+
+#elif defined( _WIN32 ) || defined( _WIN64 )
+
+	std::unique_ptr<char[]>	l_str( uCharToUtf8Fallback( ( const UChar* ) p_wstr.c_str(), p_wstr.length() ) );
+
+	return l_str.get();
+
+#else
+
+	std::unique_ptr<char[]>	l_str( wcharToUtf8Fallback( p_wstr.c_str(), p_wstr.length() ) );
+
+	return l_str.get();
+
+#endif
 } // convertToUtf8
 
 wstring LocaleFunc::convertToUtf16( const string& p_str )
@@ -2160,11 +2558,20 @@ string LocaleFunc::convertFromUtf8( const string& p_str )
 	if ( p_str.empty() )
 		return "";
 
+#if defined( DOCXFACTORY_USE_ICU )
+
 	if ( ucnv_getType( m_cnv ) == UCNV_UTF8 )
 		return p_str;
 
-	boost::scoped_array<UChar>	l_ustr;
-	boost::scoped_array<char>	l_str;
+#else
+
+	if ( isUtf8CodePage( m_codePage ) )
+		return p_str;
+
+#endif
+
+	std::unique_ptr<UChar[]>	l_ustr;
+	std::unique_ptr<char[]>	l_str;
 
 	l_ustr.reset( utf8ToUChar( p_str.c_str(), p_str.length() ) );
 	l_str.reset	( ucharToStr( l_ustr.get(), p_str.length() ) );
@@ -2178,7 +2585,7 @@ void LocaleFunc::initialize()
 {
 	m_initialized = true;
 
-	locale l_oldloc = locale::global( locale( "" ) );
+	locale l_oldloc = locale::global( getEnvLocale() );
 
 	setCodePage( "UTF-8" );
 	setNumFracSep();
@@ -2199,6 +2606,8 @@ void LocaleFunc::setCnv()
 	if ( !m_initialized )
 		initialize();
 
+#if defined( DOCXFACTORY_USE_ICU )
+
 	UErrorCode l_err = U_ZERO_ERROR;
 
 	if ( m_cnv != NULL )
@@ -2210,6 +2619,25 @@ void LocaleFunc::setCnv()
 		throw IcuException( "ucnv_open", l_err, __FILE__, __LINE__ );
 
 	m_singleByteCodePage = ( ucnv_getMaxCharSize( m_cnv ) == 1 );
+
+#elif defined( _WIN32 ) || defined( _WIN64 )
+
+	UINT	l_id = codePageToWinId( m_codePage );
+	CPINFO	l_info;
+
+	if ( l_id == 0 || !GetCPInfo( l_id, &l_info ) )
+		throw InvalidCodePageException( m_codePage, __FILE__, __LINE__ );
+
+	m_singleByteCodePage = ( l_id == CP_UTF8 ) ? false : ( l_info.MaxCharSize == 1 );
+
+#else
+
+	if ( !isUtf8CodePage( m_codePage ) )
+		throw InvalidCodePageException( m_codePage, __FILE__, __LINE__ );
+
+	m_singleByteCodePage = false;
+
+#endif
 } // setCnv
 
 
@@ -2901,6 +3329,8 @@ UChar* LocaleFunc::utf8ToUChar( const char* p_str, size_t p_len )
 	if ( !m_initialized )
 		initialize();
 
+#if defined( DOCXFACTORY_USE_ICU )
+
 	int32_t		l_bufLen;
 	int32_t		l_bufSize	= UCNV_GET_MAX_BYTES_FOR_STRING( p_len, 2 );
 	UChar*		l_buf		= new UChar[ l_bufSize ];
@@ -2931,12 +3361,20 @@ UChar* LocaleFunc::utf8ToUChar( const char* p_str, size_t p_len )
 	}
 
 	return l_buf;
+
+#else
+
+	return utf8ToUCharFallback( p_str, p_len );
+
+#endif
 } // utf8ToUChar
 
 UChar* LocaleFunc::strToUChar( const char* p_str, size_t p_len )
 {
 	if ( !m_initialized )
 		initialize();
+
+#if defined( DOCXFACTORY_USE_ICU )
 
 	UChar*		l_buf	= NULL;
 	int32_t		l_bufLen;
@@ -2974,12 +3412,27 @@ UChar* LocaleFunc::strToUChar( const char* p_str, size_t p_len )
 	}
 
 	return l_buf;
+
+#elif defined( _WIN32 ) || defined( _WIN64 )
+
+	return multiByteToUChar( p_str, p_len, codePageToWinId( m_codePage ) );
+
+#else
+
+	if ( !isUtf8CodePage( m_codePage ) )
+		throw InvalidCodePageException( m_codePage, __FILE__, __LINE__ );
+
+	return utf8ToUCharFallback( p_str, p_len );
+
+#endif
 } // strToUChar
 
 char* LocaleFunc::ucharToUtf8( const UChar* p_ustr, size_t p_len )
 {
 	if ( !m_initialized )
 		initialize();
+
+#if defined( DOCXFACTORY_USE_ICU )
 
 	int32_t		l_bufLen;
 	int32_t		l_bufSize	= UCNV_GET_MAX_BYTES_FOR_STRING( p_len, 4 );
@@ -3011,12 +3464,24 @@ char* LocaleFunc::ucharToUtf8( const UChar* p_ustr, size_t p_len )
 	}
 
 	return l_buf;
+
+#elif defined( _WIN32 ) || defined( _WIN64 )
+
+	return uCharToMultiByte( p_ustr, p_len, CP_UTF8 );
+
+#else
+
+	return uCharToUtf8Fallback( p_ustr, p_len );
+
+#endif
 } // ucharToUtf8
 
 char* LocaleFunc::ucharToStr( const UChar* p_ustr, size_t p_len )
 {
 	if ( !m_initialized )
 		initialize();
+
+#if defined( DOCXFACTORY_USE_ICU )
 
 	char*		l_buf	= NULL;
 	int32_t		l_bufSize;
@@ -3045,4 +3510,17 @@ char* LocaleFunc::ucharToStr( const UChar* p_ustr, size_t p_len )
 	}
 
 	return l_buf;
+
+#elif defined( _WIN32 ) || defined( _WIN64 )
+
+	return uCharToMultiByte( p_ustr, p_len, codePageToWinId( m_codePage ) );
+
+#else
+
+	if ( !isUtf8CodePage( m_codePage ) )
+		throw InvalidCodePageException( m_codePage, __FILE__, __LINE__ );
+
+	return uCharToUtf8Fallback( p_ustr, p_len );
+
+#endif
 } // ucharToStr

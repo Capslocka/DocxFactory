@@ -46,7 +46,7 @@
 #include "xercesc/util/XercesDefs.hpp"
 #include "xercesc/dom/DOM.hpp"
 
-#include "boost/scoped_ptr.hpp"
+#include <memory>
 
 using namespace DocxFactory;
 using namespace std;
@@ -371,6 +371,8 @@ void DocxMergerFile::mergeChartFieldByXml( xercesc::DOMElement* p_node, DocxMerg
 
 
 
+#if defined( DOCXFACTORY_HAVE_RAPIDJSON )
+
 void DocxMergerFile::mergeByJson( const string& p_json )
 {
 	rapidjson::Document	l_doc;
@@ -401,7 +403,7 @@ void DocxMergerFile::mergeItemByJson( rapidjson::Value* p_value, DocxMergerItem*
 	list<pair<rapidjson::Value*, DocxMergerItem*>>				l_valueList;
 	list<pair<rapidjson::Value*, DocxMergerItem*>>::iterator	l_valueIterator;
 
-	rapidjson::Value::Member*									l_childMember;
+	rapidjson::Value::MemberIterator								l_childMember;
 	rapidjson::Value*											l_childValue;
 	string														l_childName;
 
@@ -585,8 +587,8 @@ void DocxMergerFile::mergeFieldByJson( rapidjson::Value* p_value, DocxMergerFiel
 
 void DocxMergerFile::mergeChartFieldByJson( rapidjson::Value* p_value, DocxMergerChartField* p_chartField )
 {
-	rapidjson::Value*			l_seriesValue;
-	rapidjson::Value::Member*	l_childMember;
+	rapidjson::Value::ValueIterator	l_seriesValue;
+	rapidjson::Value::MemberIterator	l_childMember;
 	rapidjson::Value*			l_childValue;
 	string						l_childName;
 
@@ -631,6 +633,15 @@ void DocxMergerFile::mergeChartFieldByJson( rapidjson::Value* p_value, DocxMerge
 		}
 	}
 } // mergerChartFieldByJson
+
+#else
+
+void DocxMergerFile::mergeByJson( const string& p_json )
+{
+	throw InvalidMergeDataException( __FILE__, __LINE__ );;
+} // mergeByJson
+
+#endif
 
 
 

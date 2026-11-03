@@ -21,7 +21,7 @@
 #include "xercesc/dom/DOM.hpp"
 #include "xercesc/framework/MemBufInputSource.hpp"
 
-#include "boost/scoped_ptr.hpp"
+#include <memory>
 
 using namespace DocxFactory;
 using namespace std;
@@ -53,7 +53,7 @@ void OpcPart::loadDoc()
 		return;
 
 	size_t					l_bufSize;
-	boost::scoped_ptr<byte> l_buf( m_package ->getUnzipFile() ->extractEntryToBuf( OpcFunc::opcToZipPath( m_fullPath ), l_bufSize ) );
+	std::unique_ptr<byte> l_buf( m_package ->getUnzipFile() ->extractEntryToBuf( OpcFunc::opcToZipPath( m_fullPath ), l_bufSize ) );
 
 	// load/parse the doc using the package dom parser to keep it in scope for the life of the package
 	m_doc = XmlFunc::parseBufToDoc( m_package ->getDomParser(), l_buf.get(), l_bufSize );
@@ -63,7 +63,7 @@ void OpcPart::loadDoc()
 void OpcPart::save()
 {
 	size_t					l_bufSize;
-	boost::scoped_ptr<byte> l_buf;
+	std::unique_ptr<byte> l_buf;
 
 	int			l_method;
 	int			l_level;

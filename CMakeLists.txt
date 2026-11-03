@@ -1,0 +1,390 @@
+cmake_minimum_required(VERSION 3.16)
+
+project(DocxFactory VERSION 1.2.18 LANGUAGES C CXX)
+
+include(GNUInstallDirs)
+include(CMakePackageConfigHelpers)
+include(FetchContent)
+
+if(NOT CMAKE_BUILD_TYPE AND NOT CMAKE_CONFIGURATION_TYPES)
+	set(CMAKE_BUILD_TYPE Release CACHE STRING "Build type" FORCE)
+endif()
+
+set(CMAKE_CXX_STANDARD 17)
+set(CMAKE_CXX_STANDARD_REQUIRED ON)
+set(CMAKE_CXX_EXTENSIONS OFF)
+set(CMAKE_C_STANDARD 11)
+set(CMAKE_POSITION_INDEPENDENT_CODE ON)
+
+option(DOCXFACTORY_BUILD_SHARED   "Build the shared library"                 ON)
+option(DOCXFACTORY_BUILD_STATIC   "Build the static library"                 ON)
+option(DOCXFACTORY_BUILD_TOOLS    "Build the command line tools"             ON)
+option(DOCXFACTORY_ENABLE_RAPIDJSON   "Enable merging from JSON data"        ON)
+option(DOCXFACTORY_ENABLE_ICU         "Use ICU for character set conversion" OFF)
+option(DOCXFACTORY_ENABLE_IMAGEMAGICK "Use ImageMagick for image conversion" OFF)
+option(DOCXFACTORY_ENABLE_BARCODE     "Enable barcode support (needs the DocxFactory patched zint)" OFF)
+option(DOCXFACTORY_FETCH_DEPS     "Download missing dependencies with FetchContent" ON)
+
+set(DOCXFACTORY_INCLUDE_DIR	${CMAKE_CURRENT_SOURCE_DIR}/include)
+set(DOCXFACTORY_MINIZIP_DIR	${CMAKE_CURRENT_SOURCE_DIR}/third_party/minizip)
+set(DOCXFACTORY_ZINT_COMPAT_DIR	${CMAKE_CURRENT_SOURCE_DIR}/third_party/zint_compat)
+
+# ---------------------------------------------------------------------------
+# dependencies
+# ---------------------------------------------------------------------------
+
+if(CMAKE_VERSION VERSION_GREATER_EQUAL 4.0)
+	set(CMAKE_POLICY_VERSION_MINIMUM 3.5 CACHE STRING "" FORCE)
+endif()
+
+# Fetches a dependency without adding it to the build with add_subdirectory().
+function(docxfactory_fetch p_name p_url)
+	FetchContent_Declare(${p_name}
+		URL ${p_url}
+		DOWNLOAD_EXTRACT_TIMESTAMP TRUE)
+	FetchContent_GetProperties(${p_name})
+	if(NOT ${p_name}_POPULATED)
+		if(POLICY CMP0169)
+			cmake_policy(PUSH)
+			cmake_policy(SET CMP0169 OLD)
+		endif()
+		FetchContent_Populate(${p_name})
+		if(POLICY CMP0169)
+			cmake_policy(POP)
+		endif()
+	endif()
+
+	set(${p_name}_SOURCE_DIR ${${p_name}_SOURCE_DIR} PARENT_SCOPE)
+	set(${p_name}_BINARY_DIR ${${p_name}_BINARY_DIR} PARENT_SCOPE)
+endfunction()
+
+# Xerces-C (required)
+find_package(XercesC QUIET)
+
+if(TARGET XercesC::XercesC)
+	set(DOCXFACTORY_XERCES_TARGET XercesC::XercesC)
+else()
+	if(NOT DOCXFACTORY_FETCH_DEPS)
+		message(FATAL_ERROR "Xerces-C was not found. Install it or set DOCXFACTORY_FETCH_DEPS=ON.")
+	endif()
+
+	message(STATUS "Xerces-C not found, fetching it")
+	docxfactory_fetch(xercesc https://github.com/apache/xerces-c/archive/refs/tags/v3.2.5.tar.gz)
+
+	set(BUILD_SHARED_LIBS OFF CACHE BOOL "Build shared libraries" FORCE)
+	add_subdirectory(${xercesc_SOURCE_DIR} ${xercesc_BINARY_DIR} EXCLUDE_FROM_ALL)
+
+	set(DOCXFACTORY_XERCES_TARGET xerces-c)
+	set(DOCXFACTORY_XERCES_INCLUDE_DIRS
+		${xercesc_SOURCE_DIR}/src
+		${xercesc_BINARY_DIR}/src)
+endif()
+
+# zlib (required by minizip)
+find_package(ZLIB QUIET)
+
+if(TARGET ZLIB::ZLIB)
+	set(DOCXFACTORY_ZLIB_TARGET ZLIB::ZLIB)
+else()
+	if(NOT DOCXFACTORY_FETCH_DEPS)
+		message(FATAL_ERROR "zlib was not found. Install it or set DOCXFACTORY_FETCH_DEPS=ON.")
+	endif()
+
+	message(STATUS "zlib not found, fetching it")
+	docxfactory_fetch(zlib https://github.com/madler/zlib/archive/refs/tags/v1.3.1.tar.gz)
+
+	add_library(docxfactory_zlib STATIC
+		${zlib_SOURCE_DIR}/adler32.c
+		${zlib_SOURCE_DIR}/compress.c
+		${zlib_SOURCE_DIR}/crc32.c
+		${zlib_SOURCE_DIR}/deflate.c
+		${zlib_SOURCE_DIR}/gzclose.c
+		${zlib_SOURCE_DIR}/gzlib.c
+		${zlib_SOURCE_DIR}/gzread.c
+		${zlib_SOURCE_DIR}/gzwrite.c
+		${zlib_SOURCE_DIR}/infback.c
+		${zlib_SOURCE_DIR}/inffast.c
+		${zlib_SOURCE_DIR}/inflate.c
+		${zlib_SOURCE_DIR}/inftrees.c
+		${zlib_SOURCE_DIR}/trees.c
+		${zlib_SOURCE_DIR}/uncompr.c
+		${zlib_SOURCE_DIR}/zutil.c)
+
+	target_include_directories(docxfactory_zlib SYSTEM PUBLIC ${zlib_SOURCE_DIR})
+	set_target_properties(docxfactory_zlib PROPERTIES POSITION_INDEPENDENT_CODE ON)
+
+	set(DOCXFACTORY_ZLIB_TARGET docxfactory_zlib)
+endif()
+
+# minizip (vendored)
+add_library(docxfactory_minizip STATIC
+	${DOCXFACTORY_MINIZIP_DIR}/zlib/zip.c
+	${DOCXFACTORY_MINIZIP_DIR}/zlib/unzip.c
+	${DOCXFACTORY_MINIZIP_DIR}/zlib/ioapi.c)
+
+target_include_directories(docxfactory_minizip PUBLIC
+	$<BUILD_INTERFACE:${DOCXFACTORY_MINIZIP_DIR}>)
+
+target_link_libraries(docxfactory_minizip PUBLIC ${DOCXFACTORY_ZLIB_TARGET})
+
+# RapidJSON (optional)
+if(DOCXFACTORY_ENABLE_RAPIDJSON)
+	find_package(rapidjson QUIET)
+
+	if(TARGET rapidjson::rapidjson)
+		set(DOCXFACTORY_RAPIDJSON_TARGET rapidjson::rapidjson)
+	elseif(TARGET RapidJSON::RapidJSON)
+		set(DOCXFACTORY_RAPIDJSON_TARGET RapidJSON::RapidJSON)
+	else()
+		if(NOT DOCXFACTORY_FETCH_DEPS)
+			message(FATAL_ERROR "RapidJSON was not found. Install it or set DOCXFACTORY_FETCH_DEPS=ON.")
+		endif()
+
+		message(STATUS "RapidJSON not found, fetching it")
+		docxfactory_fetch(rapidjson https://github.com/Tencent/rapidjson/archive/refs/tags/v1.1.0.tar.gz)
+		set(DOCXFACTORY_RAPIDJSON_INCLUDE ${rapidjson_SOURCE_DIR}/include)
+	endif()
+endif()
+
+# ICU (optional)
+if(DOCXFACTORY_ENABLE_ICU)
+	find_package(ICU REQUIRED COMPONENTS uc)
+endif()
+
+# ImageMagick (optional)
+if(DOCXFACTORY_ENABLE_IMAGEMAGICK)
+	find_package(ImageMagick REQUIRED COMPONENTS Magick++)
+endif()
+
+# zint (optional)
+if(DOCXFACTORY_ENABLE_BARCODE)
+	find_path(DOCXFACTORY_ZINT_INCLUDE_DIR zint/zint.h)
+	find_library(DOCXFACTORY_ZINT_LIBRARY zint)
+
+	if(NOT DOCXFACTORY_ZINT_INCLUDE_DIR OR NOT DOCXFACTORY_ZINT_LIBRARY)
+		message(FATAL_ERROR
+			"Barcode support requires the DocxFactory patched zint library "
+			"(the one providing the 5 argument ZBarcode_Export()). "
+			"Set DOCXFACTORY_ENABLE_BARCODE=OFF to build without barcodes.")
+	endif()
+endif()
+
+# ---------------------------------------------------------------------------
+# sources
+# ---------------------------------------------------------------------------
+
+file(GLOB_RECURSE DOCXFACTORY_SOURCES CONFIGURE_DEPENDS
+	${CMAKE_CURRENT_SOURCE_DIR}/src/*.cpp
+	${CMAKE_CURRENT_SOURCE_DIR}/src/*.c)
+
+list(FILTER DOCXFACTORY_SOURCES EXCLUDE REGEX "/src/(WordProcessingCompiler/word-processing-compiler|WordProcessingMerger/word-processing-merger)\\.cpp$")
+list(FILTER DOCXFACTORY_SOURCES EXCLUDE REGEX "/src/UnoUtil/")
+
+if(WIN32)
+	list(FILTER DOCXFACTORY_SOURCES EXCLUDE REGEX "/src/unix/")
+else()
+	list(FILTER DOCXFACTORY_SOURCES EXCLUDE REGEX "/src/win/")
+	list(FILTER DOCXFACTORY_SOURCES EXCLUDE REGEX "/src/ConverterPrinter/Ms[A-Za-z]*Util\\.cpp$")
+endif()
+
+if(NOT DOCXFACTORY_ENABLE_RAPIDJSON)
+	list(FILTER DOCXFACTORY_SOURCES EXCLUDE REGEX "/src/json/JsonFunc\\.cpp$")
+endif()
+
+set(DOCXFACTORY_PUBLIC_HEADERS
+	${DOCXFACTORY_INCLUDE_DIR}/DocxFactory/WordProcessingCompiler/dfwc.h
+	${DOCXFACTORY_INCLUDE_DIR}/DocxFactory/WordProcessingCompiler/WordProcessingCompiler.h
+	${DOCXFACTORY_INCLUDE_DIR}/DocxFactory/WordProcessingMerger/dfw.h
+	${DOCXFACTORY_INCLUDE_DIR}/DocxFactory/WordProcessingMerger/WordProcessingMerger.h)
+
+# ---------------------------------------------------------------------------
+# object library
+# ---------------------------------------------------------------------------
+
+add_library(docxfactory_objects OBJECT ${DOCXFACTORY_SOURCES})
+
+target_include_directories(docxfactory_objects PRIVATE
+	${DOCXFACTORY_INCLUDE_DIR}
+	${DOCXFACTORY_INCLUDE_DIR}/DocxFactory/WordProcessingCompiler
+	${DOCXFACTORY_INCLUDE_DIR}/DocxFactory/WordProcessingMerger
+	${DOCXFACTORY_MINIZIP_DIR})
+
+if(DOCXFACTORY_XERCES_INCLUDE_DIRS)
+	target_include_directories(docxfactory_objects SYSTEM PRIVATE
+		${DOCXFACTORY_XERCES_INCLUDE_DIRS})
+endif()
+
+target_link_libraries(docxfactory_objects PRIVATE
+	${DOCXFACTORY_XERCES_TARGET}
+	${DOCXFACTORY_ZLIB_TARGET})
+
+if(DOCXFACTORY_ENABLE_RAPIDJSON)
+	target_compile_definitions(docxfactory_objects PRIVATE DOCXFACTORY_HAVE_RAPIDJSON)
+	if(DOCXFACTORY_RAPIDJSON_TARGET)
+		target_link_libraries(docxfactory_objects PRIVATE ${DOCXFACTORY_RAPIDJSON_TARGET})
+	elseif(DOCXFACTORY_RAPIDJSON_INCLUDE)
+		target_include_directories(docxfactory_objects SYSTEM PRIVATE ${DOCXFACTORY_RAPIDJSON_INCLUDE})
+	endif()
+endif()
+
+if(DOCXFACTORY_ENABLE_ICU)
+	target_compile_definitions(docxfactory_objects PRIVATE DOCXFACTORY_USE_ICU)
+	target_link_libraries(docxfactory_objects PRIVATE ICU::uc)
+endif()
+
+if(DOCXFACTORY_ENABLE_IMAGEMAGICK)
+	target_compile_definitions(docxfactory_objects PRIVATE DOCXFACTORY_HAVE_IMAGEMAGICK)
+	target_link_libraries(docxfactory_objects PRIVATE ImageMagick::Magick++)
+endif()
+
+if(DOCXFACTORY_ENABLE_BARCODE)
+	target_compile_definitions(docxfactory_objects PRIVATE DOCXFACTORY_HAVE_ZINT)
+	target_include_directories(docxfactory_objects PRIVATE ${DOCXFACTORY_ZINT_INCLUDE_DIR})
+	target_link_libraries(docxfactory_objects PRIVATE ${DOCXFACTORY_ZINT_LIBRARY})
+else()
+	target_include_directories(docxfactory_objects PRIVATE ${DOCXFACTORY_ZINT_COMPAT_DIR})
+endif()
+
+if(CMAKE_CXX_COMPILER_ID STREQUAL "GNU")
+	target_compile_options(docxfactory_objects PRIVATE -fpermissive)
+endif()
+
+target_compile_definitions(docxfactory_objects PRIVATE DOCXFACTORY_DLL_EXPORT)
+
+if(MSVC)
+	target_compile_options(docxfactory_objects PRIVATE /utf-8 /bigobj)
+	target_compile_definitions(docxfactory_objects PRIVATE _CRT_SECURE_NO_WARNINGS)
+endif()
+
+if(WIN32)
+	target_compile_definitions(docxfactory_objects PRIVATE NOMINMAX)
+endif()
+
+# ---------------------------------------------------------------------------
+# libraries
+# ---------------------------------------------------------------------------
+
+set(DOCXFACTORY_LINK_LIBRARIES
+	${DOCXFACTORY_XERCES_TARGET}
+	${DOCXFACTORY_ZLIB_TARGET}
+	docxfactory_minizip)
+
+if(DOCXFACTORY_ENABLE_ICU)
+	list(APPEND DOCXFACTORY_LINK_LIBRARIES ICU::uc)
+endif()
+
+if(DOCXFACTORY_ENABLE_IMAGEMAGICK)
+	list(APPEND DOCXFACTORY_LINK_LIBRARIES ImageMagick::Magick++)
+endif()
+
+if(DOCXFACTORY_ENABLE_BARCODE)
+	list(APPEND DOCXFACTORY_LINK_LIBRARIES ${DOCXFACTORY_ZINT_LIBRARY})
+endif()
+
+if(WIN32)
+	list(APPEND DOCXFACTORY_LINK_LIBRARIES ole32 oleaut32 uuid version)
+else()
+	list(APPEND DOCXFACTORY_LINK_LIBRARIES dl)
+endif()
+
+if(DOCXFACTORY_BUILD_SHARED)
+	add_library(docxfactory SHARED $<TARGET_OBJECTS:docxfactory_objects>)
+
+	target_include_directories(docxfactory PUBLIC
+		$<BUILD_INTERFACE:${DOCXFACTORY_INCLUDE_DIR}>
+		$<INSTALL_INTERFACE:${CMAKE_INSTALL_INCLUDEDIR}>)
+
+	target_link_libraries(docxfactory PRIVATE ${DOCXFACTORY_LINK_LIBRARIES})
+
+	set_target_properties(docxfactory PROPERTIES
+		OUTPUT_NAME docxfactory
+		WINDOWS_EXPORT_ALL_SYMBOLS ON)
+
+	if(WIN32 AND CMAKE_CXX_COMPILER_ID STREQUAL "GNU")
+		target_link_options(docxfactory PRIVATE -Wl,--export-all-symbols)
+	endif()
+endif()
+
+if(DOCXFACTORY_BUILD_STATIC)
+	add_library(docxfactory_static STATIC $<TARGET_OBJECTS:docxfactory_objects>)
+
+	target_include_directories(docxfactory_static PUBLIC
+		$<BUILD_INTERFACE:${DOCXFACTORY_INCLUDE_DIR}>
+		$<INSTALL_INTERFACE:${CMAKE_INSTALL_INCLUDEDIR}>)
+
+	target_compile_definitions(docxfactory_static INTERFACE DOCXFACTORY_STATIC)
+	target_link_libraries(docxfactory_static PUBLIC ${DOCXFACTORY_LINK_LIBRARIES})
+
+	set_target_properties(docxfactory_static PROPERTIES OUTPUT_NAME docxfactory)
+endif()
+
+# ---------------------------------------------------------------------------
+# command line tools
+# ---------------------------------------------------------------------------
+
+if(DOCXFACTORY_BUILD_TOOLS)
+	if(NOT DOCXFACTORY_BUILD_SHARED)
+		message(FATAL_ERROR "The command line tools require DOCXFACTORY_BUILD_SHARED=ON.")
+	endif()
+
+	add_executable(word-processing-compiler
+		${CMAKE_CURRENT_SOURCE_DIR}/src/WordProcessingCompiler/word-processing-compiler.cpp)
+
+	add_executable(word-processing-merger
+		${CMAKE_CURRENT_SOURCE_DIR}/src/WordProcessingMerger/word-processing-merger.cpp)
+
+	foreach(tool IN ITEMS word-processing-compiler word-processing-merger)
+		target_link_libraries(${tool} PRIVATE docxfactory)
+
+		if(UNIX)
+			set_target_properties(${tool} PROPERTIES INSTALL_RPATH "$ORIGIN/../${CMAKE_INSTALL_LIBDIR}")
+		endif()
+	endforeach()
+endif()
+
+# ---------------------------------------------------------------------------
+# install
+# ---------------------------------------------------------------------------
+
+install(FILES ${DOCXFACTORY_PUBLIC_HEADERS}
+	DESTINATION ${CMAKE_INSTALL_INCLUDEDIR})
+
+if(DOCXFACTORY_BUILD_SHARED)
+	install(TARGETS docxfactory
+		EXPORT DocxFactoryTargets
+		RUNTIME DESTINATION ${CMAKE_INSTALL_BINDIR}
+		LIBRARY DESTINATION ${CMAKE_INSTALL_LIBDIR}
+		ARCHIVE DESTINATION ${CMAKE_INSTALL_LIBDIR})
+endif()
+
+if(DOCXFACTORY_BUILD_STATIC)
+	install(TARGETS docxfactory_static
+		ARCHIVE DESTINATION ${CMAKE_INSTALL_LIBDIR})
+endif()
+
+if(DOCXFACTORY_BUILD_TOOLS)
+	install(TARGETS word-processing-compiler word-processing-merger
+		RUNTIME DESTINATION ${CMAKE_INSTALL_BINDIR})
+endif()
+
+if(DOCXFACTORY_BUILD_SHARED)
+	install(EXPORT DocxFactoryTargets
+		FILE DocxFactoryTargets.cmake
+		NAMESPACE DocxFactory::
+		DESTINATION ${CMAKE_INSTALL_LIBDIR}/cmake/DocxFactory)
+
+	configure_package_config_file(
+		${CMAKE_CURRENT_SOURCE_DIR}/cmake/DocxFactoryConfig.cmake.in
+		${CMAKE_CURRENT_BINARY_DIR}/DocxFactoryConfig.cmake
+		INSTALL_DESTINATION ${CMAKE_INSTALL_LIBDIR}/cmake/DocxFactory)
+
+	write_basic_package_version_file(
+		${CMAKE_CURRENT_BINARY_DIR}/DocxFactoryConfigVersion.cmake
+		VERSION ${PROJECT_VERSION}
+		COMPATIBILITY SameMajorVersion)
+
+	install(FILES
+		${CMAKE_CURRENT_BINARY_DIR}/DocxFactoryConfig.cmake
+		${CMAKE_CURRENT_BINARY_DIR}/DocxFactoryConfigVersion.cmake
+		DESTINATION ${CMAKE_INSTALL_LIBDIR}/cmake/DocxFactory)
+endif()

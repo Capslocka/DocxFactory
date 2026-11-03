@@ -7,8 +7,7 @@
 
 #include "zlib/unzip.h"
 
-#include "boost/type_traits.hpp"
-#include "boost/utility/enable_if.hpp"
+#include <type_traits>
 
 #include <map>
 #include <string>
@@ -54,11 +53,11 @@ namespace DocxFactory
 		void openStream( const string& p_path );
 		void closeStream();
 
-		template <class T>
-		typename boost::enable_if<boost::is_integral<T>, T>::type		readNum();
+		template <class T, typename std::enable_if<std::is_integral<T>::value, int>::type = 0>
+		T		readNum();
 
-		template <class T>
-		typename boost::enable_if<boost::is_floating_point<T>, T>::type	readNum();
+		template <class T, typename std::enable_if<std::is_floating_point<T>::value, int>::type = 0>
+		T		readNum();
 
 		string	readStr	();
 		void	read	( char* p_buf, size_t p_bufSize );
@@ -92,8 +91,8 @@ namespace DocxFactory
 
 	};
 
-	template <class T>
-	typename boost::enable_if<boost::is_integral<T>, T>::type UnzipFile::readNum()
+	template <class T, typename std::enable_if<std::is_integral<T>::value, int>::type>
+	T UnzipFile::readNum()
 	{
 		T l_retVal;
 
@@ -104,8 +103,8 @@ namespace DocxFactory
 		return l_retVal;
 	} // readNum<integral>
 
-	template <class T>
-	typename boost::enable_if<boost::is_floating_point<T>, T>::type UnzipFile::readNum()
+	template <class T, typename std::enable_if<std::is_floating_point<T>::value, int>::type>
+	T UnzipFile::readNum()
 	{
 		DoublePack	l_pack;
 		double		l_retVal;

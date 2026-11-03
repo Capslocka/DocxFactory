@@ -21,7 +21,7 @@
 #include "xercesc/util/PlatformUtils.hpp"
 #include "xercesc/framework/MemBufInputSource.hpp"
 
-#include "boost/scoped_ptr.hpp"
+#include <memory>
 
 using namespace DocxFactory;
 using namespace std;
@@ -89,7 +89,7 @@ void OpcRelationships::load()
 	unsigned int	l_idSeq;
 
 	size_t l_bufSize;
-	boost::scoped_ptr<byte> l_buf( m_package ->getUnzipFile() ->extractEntryToBuf(
+	std::unique_ptr<byte> l_buf( m_package ->getUnzipFile() ->extractEntryToBuf(
 		OpcFunc::opcToZipPath( m_fullPath ), l_bufSize ) );
 
 	l_doc = XmlFunc::parseBufToDoc( m_package ->getDomParser(), l_buf.get(), l_bufSize );
@@ -198,7 +198,7 @@ void OpcRelationships::save()
 
 	else
 	{
-		boost::scoped_ptr<byte>	l_buf( m_package ->getUnzipFile() ->extractEntryToRaw(
+		std::unique_ptr<byte>	l_buf( m_package ->getUnzipFile() ->extractEntryToRaw(
 			OpcFunc::opcToZipPath( m_fullPath ),
 			l_method,
 			l_level,

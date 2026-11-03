@@ -4,7 +4,7 @@
 
 #include "DocxFactory/util/DocxFactoryDefs.h"
 
-#include "boost/scoped_array.hpp"
+#include <memory>
 
 #include <cstdlib>
 #include <cstdio>
@@ -104,7 +104,7 @@ string StrFunc::caps( const string& p_str )
 	size_t	l_len = p_str.length();
 	size_t	l_pos;
 
-	boost::scoped_array<char>	l_str( new char[ l_len + 1 ] );
+	std::unique_ptr<char[]>	l_str( new char[ l_len + 1 ] );
 
 	for ( l_pos = 0; l_pos < l_len; ++l_pos )
 		l_str[ l_pos ] = toupper( p_str[ l_pos ] );
@@ -119,7 +119,7 @@ string StrFunc::lc( const string& p_str )
 	size_t	l_len = p_str.length();
 	size_t	l_pos;
 
-	boost::scoped_array<char>	l_str( new char[ l_len + 1 ] );
+	std::unique_ptr<char[]>	l_str( new char[ l_len + 1 ] );
 
 	for ( l_pos = 0; l_pos < l_len; ++l_pos )
 		l_str[ l_pos ] = tolower( p_str[ l_pos ] );
@@ -206,7 +206,7 @@ string StrFunc::removeDuplicate( const string& p_str, const string& p_chars )
 	size_t	l_len = p_str.length();
 	size_t	l_pos;
 
-	boost::scoped_array<char>	l_str( new char[ l_len + 1 ] );
+	std::unique_ptr<char[]>	l_str( new char[ l_len + 1 ] );
 	size_t						l_strLen	= 0;
 
 	const char*					l_chars		= p_chars.c_str();

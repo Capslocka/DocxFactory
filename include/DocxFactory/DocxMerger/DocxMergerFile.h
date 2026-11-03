@@ -5,7 +5,10 @@
 #include "DocxFactory/opc/OpcPackage.h"
 
 #include "xercesc/util/XercesDefs.hpp"
-#include "rapidjson/document.h"
+
+#if defined( DOCXFACTORY_HAVE_RAPIDJSON )
+	#include "rapidjson/document.h"
+#endif
 
 #include <map>
 #include <set>
@@ -85,9 +88,14 @@ namespace DocxFactory
 		void mergeChartFieldByXml	( xercesc::DOMElement*	p_node,		DocxMergerChartField*	p_chartField );
 
 		void mergeByJson			( const string& p_json );
+
+#if defined( DOCXFACTORY_HAVE_RAPIDJSON )
+
 		void mergeItemByJson		( rapidjson::Value*		p_value,	DocxMergerItem*			p_item );
 		void mergeFieldByJson		( rapidjson::Value*		p_value,	DocxMergerField*		p_field );
 		void mergeChartFieldByJson	( rapidjson::Value*		p_value,	DocxMergerChartField*	p_chartField );
+
+#endif
 
 		template<class Series_T, class Category_T>
 		void setChartValueImpl( const string& p_itemName, const string& p_fieldName, Series_T p_series, Category_T p_category, double p_value );

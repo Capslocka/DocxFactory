@@ -4,7 +4,7 @@
 
 
 
-#if defined( __unix__ ) || defined( SWIG )
+#if defined( __unix__ ) || defined( SWIG ) || defined( DOCXFACTORY_STATIC )
 	#define DOCXFACTORY_DLL
 #else
 	#ifdef  DOCXFACTORY_DLL_EXPORT

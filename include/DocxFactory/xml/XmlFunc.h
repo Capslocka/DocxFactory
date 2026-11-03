@@ -3,11 +3,10 @@
 #define __DOCXFACTORY_XML_FUNC_H__
 
 #include "DocxFactory/xml/AsciiToXMLCh.h"
+#include "DocxFactory/locale/LocaleFunc.h"
 #include "DocxFactory/util/DocxFactoryDefs.h"
 
 #include "xercesc/util/XercesDefs.hpp"
-
-#include "unicode/ucnv.h"
 
 #include <list>
 #include <vector>
