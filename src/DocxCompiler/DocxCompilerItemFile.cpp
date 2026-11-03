@@ -1078,7 +1078,7 @@ void DocxCompilerItemFile::loadFields()
 									l_tNext++;
 
 									if ( l_tNext != l_tNodeList.end() )
-										 l_chNext = ( get<3>( *l_tIterator ) )[0];
+										 l_chNext = ( get<3>( *l_tNext ) )[0];
 								}
 
 								switch ( l_ch )
@@ -1393,7 +1393,7 @@ void DocxCompilerItemFile::loadFields()
 									l_tNext++;
 
 									if ( l_tNext != l_tNodeList.end() )
-										 l_chNext = ( get<3>( *l_tIterator ) )[0];
+										 l_chNext = ( get<3>( *l_tNext ) )[0];
 								}
 
 								switch ( l_ch )
