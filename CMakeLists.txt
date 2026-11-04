@@ -63,11 +63,11 @@ endfunction()
 # imported target and cannot be exported with the package, while this build is
 # installed and exported as DocxFactory::xerces-c.
 message(STATUS "Fetching Xerces-C")
-docxfactory_fetch(xercesc https://github.com/apache/xerces-c/archive/refs/tags/v3.2.5.tar.gz)
+docxfactory_fetch(xercesc https://github.com/apache/xerces-c/archive/refs/tags/v3.3.0.tar.gz)
 
 # On Windows the project's _X() macro expands string literals to L"..."
 # (i.e. wchar_t) and therefore requires Xerces' XMLCh to be wchar_t.
-# Xerces 3.2.x defaults XMLCh to char16_t, which breaks that assumption
+# Xerces defaults XMLCh to char16_t, which breaks that assumption
 # under MSVC (cannot convert const wchar_t* to const XMLCh*). Force the
 # Windows ABI to wchar_t to match the source.
 if(WIN32)
