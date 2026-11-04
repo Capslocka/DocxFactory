@@ -22,6 +22,7 @@
 
 using namespace DocxFactory;
 using namespace std;
+using byte = DocxFactory::byte;
 
 
 
@@ -284,7 +285,7 @@ string OsFunc::normalizeFileUrl( const string& p_url )
 
 
 
-byte* OsFunc::readFile(
+DocxFactory::byte* OsFunc::readFile(
 	const string&	p_fileName,
 	size_t&			p_bufSize )
 {

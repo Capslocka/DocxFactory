@@ -71,6 +71,15 @@ else()
 	message(STATUS "Xerces-C not found, fetching it")
 	docxfactory_fetch(xercesc https://github.com/apache/xerces-c/archive/refs/tags/v3.2.5.tar.gz)
 
+	# On Windows the project's _X() macro expands string literals to L"..."
+	# (i.e. wchar_t) and therefore requires Xerces' XMLCh to be wchar_t.
+	# Xerces 3.2.x defaults XMLCh to char16_t, which breaks that assumption
+	# under MSVC (cannot convert const wchar_t* to const XMLCh*). Force the
+	# Windows ABI to wchar_t to match the source and the system Xerces default.
+	if(WIN32)
+		set(xmlch-type "wchar_t" CACHE STRING "XMLCh type" FORCE)
+	endif()
+
 	set(BUILD_SHARED_LIBS OFF CACHE BOOL "Build shared libraries" FORCE)
 	add_subdirectory(${xercesc_SOURCE_DIR} ${xercesc_BINARY_DIR} EXCLUDE_FROM_ALL)
 

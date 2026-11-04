@@ -22,6 +22,7 @@
 
 using namespace DocxFactory;
 using namespace std;
+using byte = DocxFactory::byte;
 
 #if !defined( DOCXFACTORY_USE_ICU )
 	#define UCNV_GET_MAX_BYTES_FOR_STRING( len, maxCharSize ) ( ( ( len ) + 2 ) * ( maxCharSize ) )
@@ -115,7 +116,7 @@ void XmlFunc::saveDocToFile( const xercesc::DOMDocument* p_doc, const string& p_
 	}
 } // saveDocToFile
 
-byte* XmlFunc::saveDocToBuf( const xercesc::DOMDocument* p_doc, size_t& p_bufSize )
+DocxFactory::byte* XmlFunc::saveDocToBuf( const xercesc::DOMDocument* p_doc, size_t& p_bufSize )
 {
 	byte*							l_buf			= NULL;
 	xercesc::DOMImplementationLS*	l_impl			= NULL;

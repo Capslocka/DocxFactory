@@ -14,6 +14,7 @@
 
 using namespace DocxFactory;
 using namespace std;
+using byte = DocxFactory::byte;
 
 
 
@@ -72,7 +73,7 @@ void UnzipFile::close()
 
 
 
-byte* UnzipFile::extractEntryToBuf(
+DocxFactory::byte* UnzipFile::extractEntryToBuf(
 	const string&	p_path,
 	size_t&			p_bufSize ) const
 {
@@ -125,7 +126,7 @@ byte* UnzipFile::extractEntryToBuf(
 	return l_buf;
 } // extract
 
-byte* UnzipFile::extractEntryToRaw(
+DocxFactory::byte* UnzipFile::extractEntryToRaw(
 	const string&	p_path,
 	int&			p_method,
 	int&			p_level,

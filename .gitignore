@@ -44,6 +44,7 @@ compile_commands.json
 [Dd]ebugPublic/
 [Rr]elease/
 [Rr]eleases/
+[Ii]nstall/
 x64/
 x86/
 [Bb]in/
