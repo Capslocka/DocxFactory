@@ -20,6 +20,7 @@ option(BUILD_SHARED_LIBS
 	"Build shared libraries instead of static libraries" OFF)
 
 option(DOCXFACTORY_BUILD_TOOLS    "Build the command line tools"             ON)
+option(DOCXFACTORY_BUILD_GUI      "Build the Qt test GUI (needs Qt5 Widgets)" OFF)
 option(DOCXFACTORY_ENABLE_RAPIDJSON   "Enable merging from JSON data"        ON)
 option(DOCXFACTORY_ENABLE_ICU         "Use ICU for character set conversion" OFF)
 option(DOCXFACTORY_ENABLE_IMAGEMAGICK "Use ImageMagick for image conversion" OFF)
@@ -200,6 +201,7 @@ file(GLOB_RECURSE DOCXFACTORY_SOURCES CONFIGURE_DEPENDS
 
 list(FILTER DOCXFACTORY_SOURCES EXCLUDE REGEX "/src/(WordProcessingCompiler/word-processing-compiler|WordProcessingMerger/word-processing-merger)\\.cpp$")
 list(FILTER DOCXFACTORY_SOURCES EXCLUDE REGEX "/src/UnoUtil/")
+list(FILTER DOCXFACTORY_SOURCES EXCLUDE REGEX "/src/WordProcessingTestGui/")
 
 if(WIN32)
 	list(FILTER DOCXFACTORY_SOURCES EXCLUDE REGEX "/src/unix/")
@@ -382,6 +384,46 @@ if(DOCXFACTORY_BUILD_TOOLS)
 endif()
 
 # ---------------------------------------------------------------------------
+# Qt test GUI
+# ---------------------------------------------------------------------------
+
+if(DOCXFACTORY_BUILD_GUI)
+	# Qt must match the compiler used for the library: with the default MSVC
+	# generator point CMAKE_PREFIX_PATH at the Qt msvc kit, not the MinGW one.
+	find_package(Qt5 5.15 REQUIRED COMPONENTS Widgets)
+
+	add_executable(word-processing-test-gui
+		${CMAKE_CURRENT_SOURCE_DIR}/src/WordProcessingTestGui/main.cpp
+		${CMAKE_CURRENT_SOURCE_DIR}/src/WordProcessingTestGui/TestWindow.h
+		${CMAKE_CURRENT_SOURCE_DIR}/src/WordProcessingTestGui/TestWindow.cpp
+		${CMAKE_CURRENT_SOURCE_DIR}/src/WordProcessingTestGui/DfWorker.h
+		${CMAKE_CURRENT_SOURCE_DIR}/src/WordProcessingTestGui/DfWorker.cpp
+		${CMAKE_CURRENT_SOURCE_DIR}/src/WordProcessingTestGui/CompilerApi.h
+		${CMAKE_CURRENT_SOURCE_DIR}/src/WordProcessingTestGui/CompilerApi.cpp)
+
+	set_target_properties(word-processing-test-gui PROPERTIES
+		AUTOMOC ON
+		WIN32_EXECUTABLE ON)
+
+	target_link_libraries(word-processing-test-gui PRIVATE docxfactory Qt5::Widgets)
+
+	if(MSVC)
+		target_compile_options(word-processing-test-gui PRIVATE /utf-8)
+	endif()
+
+	if(BUILD_SHARED_LIBS AND WIN32)
+		add_custom_command(TARGET word-processing-test-gui POST_BUILD
+			COMMAND ${CMAKE_COMMAND} -E copy_if_different
+				$<TARGET_FILE:docxfactory>
+				$<TARGET_FILE:${DOCXFACTORY_XERCES_TARGET}>
+				$<TARGET_FILE:${DOCXFACTORY_MINIZIP_TARGET}>
+				$<TARGET_FILE:${DOCXFACTORY_ZLIB_TARGET}>
+				$<TARGET_FILE_DIR:word-processing-test-gui>
+			VERBATIM)
+	endif()
+endif()
+
+# ---------------------------------------------------------------------------
 # install
 # ---------------------------------------------------------------------------
 
@@ -408,6 +450,11 @@ install(TARGETS ${DOCXFACTORY_XERCES_TARGET}
 
 if(DOCXFACTORY_BUILD_TOOLS)
 	install(TARGETS word-processing-compiler word-processing-merger
+		RUNTIME DESTINATION ${CMAKE_INSTALL_BINDIR})
+endif()
+
+if(DOCXFACTORY_BUILD_GUI)
+	install(TARGETS word-processing-test-gui
 		RUNTIME DESTINATION ${CMAKE_INSTALL_BINDIR})
 endif()
 
