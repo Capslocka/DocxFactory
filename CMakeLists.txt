@@ -398,6 +398,7 @@ if(DOCXFACTORY_BUILD_GUI)
 		${CMAKE_CURRENT_SOURCE_DIR}/src/WordProcessingTestGui/TestWindow.cpp
 		${CMAKE_CURRENT_SOURCE_DIR}/src/WordProcessingTestGui/DfWorker.h
 		${CMAKE_CURRENT_SOURCE_DIR}/src/WordProcessingTestGui/DfWorker.cpp
+		${CMAKE_CURRENT_SOURCE_DIR}/src/WordProcessingTestGui/LibStr.h
 		${CMAKE_CURRENT_SOURCE_DIR}/src/WordProcessingTestGui/CompilerApi.h
 		${CMAKE_CURRENT_SOURCE_DIR}/src/WordProcessingTestGui/CompilerApi.cpp)
 

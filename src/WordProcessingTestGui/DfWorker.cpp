@@ -1,6 +1,7 @@
 #include "DfWorker.h"
 
 #include "CompilerApi.h"
+#include "LibStr.h"
 
 #include "DocxFactory/WordProcessingMerger/dfw.h"
 
@@ -10,8 +11,8 @@
 namespace
 {
 
-QString			lastWhat()	{ return QString::fromUtf8( dfw_getErrorWhat() ); }
-QString			lastWhere()	{ return QString::fromUtf8( dfw_getErrorWhere() ); }
+QString			lastWhat()	{ return fromLibStr( dfw_getErrorWhat() ); }
+QString			lastWhere()	{ return fromLibStr( dfw_getErrorWhere() ); }
 
 QStringList		splitNames( const QString& p_names )
 {
@@ -24,7 +25,7 @@ QStringList		splitNames( const QString& p_names )
 QStringList		itemNames()
 {
 	// the API returns a static buffer that the next call overwrites
-	return splitNames( QString::fromUtf8( dfw_getItems() ) );
+	return splitNames( fromLibStr( dfw_getItems() ) );
 }
 
 } // namespace
@@ -59,7 +60,7 @@ void DfWorker::queryTempDir()
 
 void DfWorker::loadTemplate( const QString& p_file )
 {
-	const QByteArray l_file = p_file.toUtf8();
+	const QByteArray l_file = toLibPath( p_file );
 
 	dfw_load( l_file.constData() );
 
@@ -107,7 +108,9 @@ void DfWorker::mergeData( const QByteArray& p_data )
 void DfWorker::setClipboardValue( const QString& p_item, const QString& p_field,
 								  const QString& p_value, const QString& p_context )
 {
-	const QByteArray l_item	= p_item.toUtf8();
+	// loadTemplate sets the session code page to UTF-8, so values are UTF-8
+	// while paths (see toLibPath) are the only strings in the ANSI code page
+	const QByteArray l_item		= p_item.toUtf8();
 	const QByteArray l_field	= p_field.toUtf8();
 	const QByteArray l_value	= p_value.toUtf8();
 
@@ -127,7 +130,7 @@ void DfWorker::pasteItem( const QString& p_item )
 
 void DfWorker::saveDocument( const QString& p_file )
 {
-	const QByteArray l_file = p_file.toUtf8();
+	const QByteArray l_file = toLibPath( p_file );
 
 	dfw_save( l_file.constData() );
 
@@ -137,7 +140,7 @@ void DfWorker::saveDocument( const QString& p_file )
 void DfWorker::queryItemFields( const QString& p_item )
 {
 	const QByteArray	l_item = p_item.toUtf8();
-	const QString		l_fields = QString::fromUtf8( dfw_getItemFields( l_item.constData() ) );
+	const QString		l_fields = fromLibStr( dfw_getItemFields( l_item.constData() ) );
 
 	emit itemFieldsQueried( p_item, splitNames( l_fields ) );
 } // queryItemFields
