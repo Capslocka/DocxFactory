@@ -316,7 +316,7 @@ target_include_directories(docxfactory PUBLIC
 
 set_target_properties(docxfactory PROPERTIES
 	OUTPUT_NAME docxfactory
-	DEBUG_POSTFIX d)
+	OUTPUT_NAME_DEBUG docxfactoryd)
 
 if(DOCXFACTORY_LIBRARY_TYPE STREQUAL "SHARED")
 	target_link_libraries(docxfactory PRIVATE ${DOCXFACTORY_LINK_LIBRARIES})
