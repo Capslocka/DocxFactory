@@ -16,8 +16,16 @@ set(CMAKE_CXX_EXTENSIONS OFF)
 set(CMAKE_C_STANDARD 11)
 set(CMAKE_POSITION_INDEPENDENT_CODE ON)
 
-option(DOCXFACTORY_BUILD_SHARED   "Build the shared library"                 ON)
-option(DOCXFACTORY_BUILD_STATIC   "Build the static library"                 ON)
+set(DOCXFACTORY_LIBRARY_TYPE "SHARED" CACHE STRING
+	"Library type to build, SHARED or STATIC (only one is built)")
+set_property(CACHE DOCXFACTORY_LIBRARY_TYPE PROPERTY STRINGS SHARED STATIC)
+string(TOUPPER "${DOCXFACTORY_LIBRARY_TYPE}" DOCXFACTORY_LIBRARY_TYPE)
+
+if(NOT DOCXFACTORY_LIBRARY_TYPE MATCHES "^(SHARED|STATIC)$")
+	message(FATAL_ERROR
+		"DOCXFACTORY_LIBRARY_TYPE must be SHARED or STATIC (got '${DOCXFACTORY_LIBRARY_TYPE}').")
+endif()
+
 option(DOCXFACTORY_BUILD_TOOLS    "Build the command line tools"             ON)
 option(DOCXFACTORY_ENABLE_RAPIDJSON   "Enable merging from JSON data"        ON)
 option(DOCXFACTORY_ENABLE_ICU         "Use ICU for character set conversion" OFF)
@@ -258,7 +266,11 @@ if(CMAKE_CXX_COMPILER_ID STREQUAL "GNU")
 	target_compile_options(docxfactory_objects PRIVATE -fpermissive)
 endif()
 
-target_compile_definitions(docxfactory_objects PRIVATE DOCXFACTORY_DLL_EXPORT)
+if(DOCXFACTORY_LIBRARY_TYPE STREQUAL "SHARED")
+	target_compile_definitions(docxfactory_objects PRIVATE DOCXFACTORY_DLL_EXPORT)
+else()
+	target_compile_definitions(docxfactory_objects PRIVATE DOCXFACTORY_STATIC)
+endif()
 
 if(MSVC)
 	target_compile_options(docxfactory_objects PRIVATE /utf-8 /bigobj)
@@ -296,35 +308,27 @@ else()
 	list(APPEND DOCXFACTORY_LINK_LIBRARIES dl)
 endif()
 
-if(DOCXFACTORY_BUILD_SHARED)
-	add_library(docxfactory SHARED $<TARGET_OBJECTS:docxfactory_objects>)
+add_library(docxfactory ${DOCXFACTORY_LIBRARY_TYPE} $<TARGET_OBJECTS:docxfactory_objects>)
 
-	target_include_directories(docxfactory PUBLIC
-		$<BUILD_INTERFACE:${DOCXFACTORY_INCLUDE_DIR}>
-		$<INSTALL_INTERFACE:${CMAKE_INSTALL_INCLUDEDIR}>)
+target_include_directories(docxfactory PUBLIC
+	$<BUILD_INTERFACE:${DOCXFACTORY_INCLUDE_DIR}>
+	$<INSTALL_INTERFACE:${CMAKE_INSTALL_INCLUDEDIR}>)
 
+set_target_properties(docxfactory PROPERTIES
+	OUTPUT_NAME docxfactory
+	DEBUG_POSTFIX d)
+
+if(DOCXFACTORY_LIBRARY_TYPE STREQUAL "SHARED")
 	target_link_libraries(docxfactory PRIVATE ${DOCXFACTORY_LINK_LIBRARIES})
 
-	set_target_properties(docxfactory PROPERTIES
-		OUTPUT_NAME docxfactory
-		WINDOWS_EXPORT_ALL_SYMBOLS ON)
+	set_target_properties(docxfactory PROPERTIES WINDOWS_EXPORT_ALL_SYMBOLS ON)
 
 	if(WIN32 AND CMAKE_CXX_COMPILER_ID STREQUAL "GNU")
 		target_link_options(docxfactory PRIVATE -Wl,--export-all-symbols)
 	endif()
-endif()
-
-if(DOCXFACTORY_BUILD_STATIC)
-	add_library(docxfactory_static STATIC $<TARGET_OBJECTS:docxfactory_objects>)
-
-	target_include_directories(docxfactory_static PUBLIC
-		$<BUILD_INTERFACE:${DOCXFACTORY_INCLUDE_DIR}>
-		$<INSTALL_INTERFACE:${CMAKE_INSTALL_INCLUDEDIR}>)
-
-	target_compile_definitions(docxfactory_static INTERFACE DOCXFACTORY_STATIC)
-	target_link_libraries(docxfactory_static PUBLIC ${DOCXFACTORY_LINK_LIBRARIES})
-
-	set_target_properties(docxfactory_static PROPERTIES OUTPUT_NAME docxfactory)
+else()
+	target_link_libraries(docxfactory PUBLIC ${DOCXFACTORY_LINK_LIBRARIES})
+	target_compile_definitions(docxfactory INTERFACE DOCXFACTORY_STATIC)
 endif()
 
 # ---------------------------------------------------------------------------
@@ -332,10 +336,6 @@ endif()
 # ---------------------------------------------------------------------------
 
 if(DOCXFACTORY_BUILD_TOOLS)
-	if(NOT DOCXFACTORY_BUILD_SHARED)
-		message(FATAL_ERROR "The command line tools require DOCXFACTORY_BUILD_SHARED=ON.")
-	endif()
-
 	add_executable(word-processing-compiler
 		${CMAKE_CURRENT_SOURCE_DIR}/src/WordProcessingCompiler/word-processing-compiler.cpp)
 
@@ -358,16 +358,14 @@ endif()
 install(FILES ${DOCXFACTORY_PUBLIC_HEADERS}
 	DESTINATION ${CMAKE_INSTALL_INCLUDEDIR})
 
-if(DOCXFACTORY_BUILD_SHARED)
+if(DOCXFACTORY_LIBRARY_TYPE STREQUAL "SHARED")
 	install(TARGETS docxfactory
 		EXPORT DocxFactoryTargets
 		RUNTIME DESTINATION ${CMAKE_INSTALL_BINDIR}
 		LIBRARY DESTINATION ${CMAKE_INSTALL_LIBDIR}
 		ARCHIVE DESTINATION ${CMAKE_INSTALL_LIBDIR})
-endif()
-
-if(DOCXFACTORY_BUILD_STATIC)
-	install(TARGETS docxfactory_static
+else()
+	install(TARGETS docxfactory
 		ARCHIVE DESTINATION ${CMAKE_INSTALL_LIBDIR})
 endif()
 
@@ -376,7 +374,7 @@ if(DOCXFACTORY_BUILD_TOOLS)
 		RUNTIME DESTINATION ${CMAKE_INSTALL_BINDIR})
 endif()
 
-if(DOCXFACTORY_BUILD_SHARED)
+if(DOCXFACTORY_LIBRARY_TYPE STREQUAL "SHARED")
 	install(EXPORT DocxFactoryTargets
 		FILE DocxFactoryTargets.cmake
 		NAMESPACE DocxFactory::
