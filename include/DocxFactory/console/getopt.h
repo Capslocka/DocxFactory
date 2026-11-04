@@ -67,11 +67,23 @@ EXPRESSLY ADVISED OF THE POSSIBILITY OF SUCH DAMAGES.
 	#include <string.h>
 	#include <wchar.h>
 
+	// Automatic export of all symbols on Windows only covers functions, so
+	// the getopt globals need explicit import/export decorations.
+	#if defined( _WIN32 ) && !defined( DOCXFACTORY_STATIC )
+		#ifdef DOCXFACTORY_DLL_EXPORT
+			#define _GETOPT_DATA __declspec(dllexport)
+		#else
+			#define _GETOPT_DATA __declspec(dllimport)
+		#endif
+	#else
+		#define _GETOPT_DATA
+	#endif
+
 _BEGIN_EXTERN_C
 
-	extern int optind;
-	extern int opterr;
-	extern int optopt;
+	extern _GETOPT_DATA int optind;
+	extern _GETOPT_DATA int opterr;
+	extern _GETOPT_DATA int optopt;
 
 	// Ansi
 	struct option_a
@@ -81,7 +93,7 @@ _BEGIN_EXTERN_C
 		int *flag;
 		char val;
 	};
-	extern char *optarg_a;
+	extern _GETOPT_DATA char *optarg_a;
 	int getopt_a(int argc, char *const *argv, const char *optstring) _GETOPT_THROW;
 	int getopt_long_a(int argc, char *const *argv, const char *options, const struct option_a *long_options, int *opt_index) _GETOPT_THROW;
 	int getopt_long_only_a(int argc, char *const *argv, const char *options, const struct option_a *long_options, int *opt_index) _GETOPT_THROW;
@@ -94,7 +106,7 @@ _BEGIN_EXTERN_C
 		int *flag;
 		wchar_t val;
 	};
-	extern wchar_t *optarg_w;
+	extern _GETOPT_DATA wchar_t *optarg_w;
 	int getopt_w(int argc, wchar_t *const *argv, const wchar_t *optstring) _GETOPT_THROW;
 	int getopt_long_w(int argc, wchar_t *const *argv, const wchar_t *options, const struct option_w *long_options, int *opt_index) _GETOPT_THROW;
 	int getopt_long_only_w(int argc, wchar_t *const *argv, const wchar_t *options, const struct option_w *long_options, int *opt_index) _GETOPT_THROW;	
@@ -105,6 +117,7 @@ _END_EXTERN_C
 	#undef _END_EXTERN_C
 	#undef _GETOPT_THROW
 	#undef _GETOPT_API
+	#undef _GETOPT_DATA
 
 	#ifdef _UNICODE
 		#define getopt getopt_w

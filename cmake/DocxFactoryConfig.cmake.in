@@ -1,5 +1,40 @@
 @PACKAGE_INIT@
 
+include(CMakeFindDependencyMacro)
+
+# Xerces-C is part of DocxFactoryTargets.cmake and links Threads::Threads.
+find_dependency(Threads)
+
 include("${CMAKE_CURRENT_LIST_DIR}/DocxFactoryTargets.cmake")
+
+# Xerces-C, minizip and zlib are part of DocxFactoryTargets.cmake, so a static
+# consumer only needs what could not be exported: the optional dependencies
+# linked as imported targets.
+if(@DOCXFACTORY_CONFIG_STATIC@)
+	set(_docxfactory_link_libraries)
+
+	if(@DOCXFACTORY_CONFIG_USE_ICU@)
+		find_dependency(ICU REQUIRED COMPONENTS uc)
+		list(APPEND _docxfactory_link_libraries ICU::uc)
+	endif()
+
+	if(@DOCXFACTORY_CONFIG_USE_IMAGEMAGICK@)
+		find_dependency(ImageMagick REQUIRED COMPONENTS Magick++)
+		list(APPEND _docxfactory_link_libraries ImageMagick::Magick++)
+	endif()
+
+	set(_docxfactory_zint "@DOCXFACTORY_CONFIG_ZINT_LIBRARY@")
+	if(_docxfactory_zint)
+		list(APPEND _docxfactory_link_libraries "${_docxfactory_zint}")
+	endif()
+
+	if(_docxfactory_link_libraries)
+		set_property(TARGET DocxFactory::docxfactory APPEND PROPERTY
+			INTERFACE_LINK_LIBRARIES "${_docxfactory_link_libraries}")
+	endif()
+
+	unset(_docxfactory_link_libraries)
+	unset(_docxfactory_zint)
+endif()
 
 check_required_components(DocxFactory)
