@@ -160,6 +160,7 @@ DocxCompilerItem::DocxCompilerItem(
 	m_bodyNode		= NULL;
 
 	m_topLevel		= false;
+	m_fillItemParent = NULL;
 	m_fillItemGroup	= NULL;
 
 	m_itemLayout	= NULL;

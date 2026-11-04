@@ -546,6 +546,7 @@ void DocxCompilerItemFile::loadItemsByBookmark( DocxCompilerBookmark* p_bookmark
 	DocxCompilerBooleanField::BooleanValue	l_value;
 	size_t									l_len;
 	bool									l_ok;
+	bool									l_endReachable;
 
 	xercesc::DOMDocument*					l_doc;
 	xercesc::DOMElement*					l_bodyNode;
@@ -577,6 +578,25 @@ void DocxCompilerItemFile::loadItemsByBookmark( DocxCompilerBookmark* p_bookmark
 		l_name	= l_childBookmark ->getName();
 		l_len	= l_name.length();
 		l_ok	= false;
+
+		// normalizeBookmarksBr can put a bookmarkEnd before its bookmarkStart
+		// (around a body level page break), and an outer bookmark may already
+		// have consumed these nodes; in both cases there is no sibling range.
+		if ( !l_parentNode )
+			continue;
+
+		l_endReachable = false;
+
+		for( l_childNode = l_childBookmark ->getStartNode() ->getNextSibling();
+			l_childNode;
+			l_childNode = l_childNode ->getNextSibling() )
+		{
+			if ( l_childNode == l_childBookmark ->getEndNode() )
+			{
+				l_endReachable = true;
+				break;
+			}
+		}
 
 		if ( l_len > 7 && l_name.substr( l_len - 7 ) == "_notset" )
 		{
@@ -618,7 +638,7 @@ void DocxCompilerItemFile::loadItemsByBookmark( DocxCompilerBookmark* p_bookmark
 			l_placeHolderNode ->setAttribute( _X( "type" ), _X( "boolean" ) );
 			l_placeHolderNode ->setAttribute( _X( "ptr" ), Utf8ToXMLCh( StrFunc::intToStr( ( size_t ) l_booleanField ) ) );
 
-			while ( true )
+			while ( l_endReachable )
 			{
 				l_childNode	= l_childBookmark ->getStartNode() ->getNextSibling();
 
@@ -710,7 +730,7 @@ void DocxCompilerItemFile::loadItemsByBookmark( DocxCompilerBookmark* p_bookmark
 				p_itemPath ->pop_back();
 			}
 
-			while ( true )
+			while ( l_endReachable )
 			{
 				l_childNode	= l_childBookmark ->getStartNode() ->getNextSibling();
 
@@ -753,8 +773,13 @@ void DocxCompilerItemFile::loadItemsByBookmark( DocxCompilerBookmark* p_bookmark
 			}
 		}
 
-		l_parentNode ->removeChild( l_childBookmark ->getStartNode() );
-		l_parentNode ->removeChild( l_childBookmark ->getEndNode() );
+		l_childNode	= l_childBookmark ->getStartNode() ->getParentNode();
+		if ( l_childNode )
+			l_childNode ->removeChild( l_childBookmark ->getStartNode() );
+
+		l_childNode	= l_childBookmark ->getEndNode() ->getParentNode();
+		if ( l_childNode )
+			l_childNode ->removeChild( l_childBookmark ->getEndNode() );
 	}
 } // loadItemsByBookmark
 

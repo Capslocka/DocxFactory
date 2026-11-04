@@ -182,7 +182,7 @@ DocxCompilerItemLayout::DocxCompilerItemLayout(
 		{
 			if( l_tcIterator ->first	== 0
 			 && l_tcIterator ->second	== NULL )
-				l_trIterator ->second.erase( l_tcIterator );
+				l_tcIterator = l_trIterator ->second.erase( l_tcIterator );
 
 			else
 				l_tcIterator++;
