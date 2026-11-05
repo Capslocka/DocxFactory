@@ -50,6 +50,7 @@ private slots:
 	void onBrowseData();
 	void onMerge();
 	void onItemChanged( const QString& p_item );
+	void onBrowseValue();
 	void onAddRow();
 	void onApplyRows();
 	void onRemoveRow();
@@ -107,6 +108,7 @@ private:
 	DfWorker*			m_worker;
 	bool				m_busy;
 	bool				m_loaded;
+	bool				m_instantiated;
 	bool				m_compileTargetAuto;
 	bool				m_saveFileAuto;
 	QString				m_loadedFile;
@@ -131,6 +133,7 @@ private:
 	QComboBox*			m_itemCombo;
 	QComboBox*			m_fieldCombo;
 	QLineEdit*			m_valueEdit;
+	QPushButton*		m_browseValueButton;
 	QPushButton*		m_addRowButton;
 	QTableWidget*		m_valueTable;
 	QPushButton*		m_applyButton;

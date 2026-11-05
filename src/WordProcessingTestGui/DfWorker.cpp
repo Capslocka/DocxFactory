@@ -6,6 +6,8 @@
 #include "DocxFactory/WordProcessingMerger/dfw.h"
 
 #include <QByteArray>
+#include <QFile>
+#include <QFileInfo>
 #include <QStringList>
 
 namespace
@@ -13,6 +15,19 @@ namespace
 
 QString			lastWhat()	{ return fromLibStr( dfw_getErrorWhat() ); }
 QString			lastWhere()	{ return fromLibStr( dfw_getErrorWhere() ); }
+
+QByteArray		clipboardValue( const QString& p_value )
+{
+	// text values reach the document as UTF-8, but picture fields take a file
+	// name that the library opens with narrow ANSI file APIs; sending UTF-8
+	// there makes the file look missing and the picture is dropped silently
+	const QFileInfo l_fileInfo( p_value );
+
+	if ( l_fileInfo.isFile() )
+		return QFile::encodeName( l_fileInfo.absoluteFilePath() );
+
+	return p_value.toUtf8();
+} // clipboardValue
 
 QStringList		splitNames( const QString& p_names )
 {
@@ -108,11 +123,9 @@ void DfWorker::mergeData( const QByteArray& p_data )
 void DfWorker::setClipboardValue( const QString& p_item, const QString& p_field,
 								  const QString& p_value, const QString& p_context )
 {
-	// loadTemplate sets the session code page to UTF-8, so values are UTF-8
-	// while paths (see toLibPath) are the only strings in the ANSI code page
 	const QByteArray l_item		= p_item.toUtf8();
 	const QByteArray l_field	= p_field.toUtf8();
-	const QByteArray l_value	= p_value.toUtf8();
+	const QByteArray l_value	= clipboardValue( p_value );
 
 	dfw_setClipboardValueByStr( l_item.constData(), l_field.constData(), l_value.constData() );
 

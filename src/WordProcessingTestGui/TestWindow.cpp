@@ -43,6 +43,7 @@ TestWindow::TestWindow( QWidget* p_parent )
 	, m_worker( nullptr )
 	, m_busy( false )
 	, m_loaded( false )
+	, m_instantiated( false )
 	, m_compileTargetAuto( true )
 	, m_saveFileAuto( true )
 {
@@ -227,14 +228,18 @@ QWidget* TestWindow::createMergerTab()
 	l_fieldRow ->addWidget( m_fieldCombo, 1 );
 
 	m_valueEdit = new QLineEdit( l_valueGroup );
-	m_valueEdit ->setPlaceholderText( "值" );
+	m_valueEdit ->setPlaceholderText( "值，或图片/文件路径" );
 
-	m_addRowButton = makeButton( "加入表格", l_valueGroup );
+	m_browseValueButton = makeButton( "选图片...", l_valueGroup );
+	m_addRowButton		= makeButton( "加入表格", l_valueGroup );
+
+	connect( m_browseValueButton,&QPushButton::clicked,	this, &TestWindow::onBrowseValue );
 	connect( m_addRowButton,	&QPushButton::clicked,	this, &TestWindow::onAddRow );
 	connect( m_valueEdit,		&QLineEdit::returnPressed, this, &TestWindow::onAddRow );
 
 	QHBoxLayout* l_valueRow = new QHBoxLayout;
 	l_valueRow ->addWidget( m_valueEdit, 1 );
+	l_valueRow ->addWidget( m_browseValueButton );
 	l_valueRow ->addWidget( m_addRowButton );
 
 	m_valueTable = new QTableWidget( 0, 3, l_valueGroup );
@@ -276,6 +281,14 @@ QWidget* TestWindow::createMergerTab()
 	l_valueLayout ->addLayout( l_valueRow );
 	l_valueLayout ->addWidget( m_valueTable );
 	l_valueLayout ->addLayout( l_valueButtons );
+
+	QLabel* l_valueHint = new QLabel(
+		"提示: 「应用全部」只把值放进待粘贴内容；"
+		"需再点「粘贴（生成项）」才会写入文档，然后保存。\n"
+		"图片字段（如 pic4_2_1）的值填图片文件路径，可用「选图片...」；"
+		"路径按系统编码传给库，中文路径可用。", l_valueGroup );
+	l_valueHint ->setWordWrap( true );
+	l_valueLayout ->addWidget( l_valueHint );
 
 	// save
 	QGroupBox* l_saveGroup = new QGroupBox( "保存", l_tab );
@@ -403,7 +416,8 @@ void TestWindow::updateActions()
 
 void TestWindow::setSessionLoaded( bool p_loaded )
 {
-	m_loaded = p_loaded;
+	m_loaded		= p_loaded;
+	m_instantiated	= false;
 
 	if ( !p_loaded )
 	{
@@ -695,6 +709,18 @@ void TestWindow::onItemChanged( const QString& p_item )
 	emit fieldsRequested( p_item.trimmed() );
 } // onItemChanged
 
+void TestWindow::onBrowseValue()
+{
+	const QString l_file = QFileDialog::getOpenFileName( this,
+		"选择图片文件", QString(),
+		"图片 (*.png *.jpg *.jpeg *.gif *.bmp *.tif *.tiff *.emf *.wmf);;所有文件 (*)" );
+
+	if ( l_file.isEmpty() )
+		return;
+
+	m_valueEdit ->setText( QDir::toNativeSeparators( l_file ) );
+} // onBrowseValue
+
 void TestWindow::onAddRow()
 {
 	const QString l_item	= m_itemCombo ->currentText().trimmed();
@@ -724,6 +750,15 @@ void TestWindow::onAddRow()
 		log( "空值会被 DocxFactory 忽略，未加入表格" );
 		return;
 	}
+
+	// picture fields silently drop a file that does not exist, so say so here
+	const QFileInfo	l_valueInfo( l_value );
+	static const QStringList l_imageExts =
+		{ "png", "jpg", "jpeg", "gif", "bmp", "tif", "tiff", "emf", "wmf" };
+
+	if ( l_imageExts.contains( l_valueInfo.suffix().toLower() ) && !l_valueInfo.isFile() )
+		log( "警告: 图片文件不存在，库会静默忽略该图片字段: "
+			+ QDir::toNativeSeparators( l_value ) );
 
 	const int l_row = m_valueTable ->rowCount();
 
@@ -839,6 +874,21 @@ void TestWindow::onSave()
 		return;
 	}
 
+	if ( !m_instantiated )
+	{
+		const QMessageBox::StandardButton l_answer = QMessageBox::warning( this, "保存",
+			"尚未合并数据，也未粘贴任何 item。\n"
+			"剪贴板值只放进待粘贴内容，必须点「粘贴（生成项）」才会写入文档。\n"
+			"现在保存的文档几乎是空的。仍要保存吗？",
+			QMessageBox::Save | QMessageBox::Cancel, QMessageBox::Cancel );
+
+		if ( l_answer != QMessageBox::Save )
+		{
+			log( "已取消保存（未合并数据也未粘贴）" );
+			return;
+		}
+	}
+
 	if ( !confirmOverwrite( l_file ) )
 	{
 		log( "已取消保存" );
@@ -942,7 +992,10 @@ void TestWindow::onMerged( bool p_ok, const QString& p_what, const QString& p_wh
 	setBusy( false );
 
 	if ( p_ok )
+	{
+		m_instantiated = true;
 		logResult( true, "合并完成（模板仍在会话中，可继续粘贴或保存）", p_what, p_where );
+	}
 
 	else
 	{
@@ -973,7 +1026,10 @@ void TestWindow::onPasted( bool p_ok, const QString& p_what, const QString& p_wh
 	setBusy( false );
 
 	if ( p_ok )
+	{
+		m_instantiated = true;
 		logResult( true, "粘贴完成", p_what, p_where );
+	}
 
 	else
 	{
